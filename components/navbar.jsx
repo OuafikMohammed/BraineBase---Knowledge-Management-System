@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Menu, Home, FileText, FileEdit, Settings, Sun, Moon } from "lucide-react"
+import { Menu, Home, FileText, FileEdit, Settings, Sun, Moon, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -15,129 +15,113 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-// Add the RoleSelector component to the navbar
 import RoleSelector from "@/components/role-selector"
+import { motion, AnimatePresence } from "framer-motion"
+import LoginModal from "@/components/login-modal"
+import SignupModal from "@/components/signup-modal"
 
 export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, onLogout, theme, toggleTheme }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <nav className="border-b border-gray-200 py-4 px-4 md:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <div className="flex items-center">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Open navigation menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-              <SheetHeader className="mb-6">
-                <SheetTitle>Navigation</SheetTitle>
-              </SheetHeader>
-              <div className="flex flex-col space-y-4">
-                <Link href="/" className="flex items-center space-x-2 px-2 py-2 rounded-md hover:bg-accent">
-                  <Home className="h-5 w-5" />
-                  <span>Home</span>
-                </Link>
-                <Link href="/pdfs" className="flex items-center space-x-2 px-2 py-2 rounded-md hover:bg-accent">
-                  <FileText className="h-5 w-5" />
-                  <span>PDFs</span>
-                </Link>
-                <Link href="/notes" className="flex items-center space-x-2 px-2 py-2 rounded-md hover:bg-accent">
-                  <FileEdit className="h-5 w-5" />
-                  <span>Notes</span>
-                </Link>
-                <Link href="/settings" className="flex items-center space-x-2 px-2 py-2 rounded-md hover:bg-accent">
-                  <Settings className="h-5 w-5" />
-                  <span>Settings</span>
-                </Link>
+    <header className="sticky top-0 z-50 backdrop-blur-lg border-b border-[#7b4fff]/20">
+      <div className="absolute inset-0 bg-[#0e0a1a]/80" />
+      
+      <nav className="max-w-7xl mx-auto px-4 relative">
+        <div className="flex items-center justify-between h-16">
+          <motion.div 
+            className="flex items-center"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Link href="/" className="text-xl font-bold text-white">
+              BraineBase
+            </Link>
+          </motion.div>
 
-                <div className="pt-4 border-t">
-                  <Button variant="ghost" className="w-full justify-start" onClick={toggleTheme}>
-                    {theme === "dark" ? (
-                      <>
-                        <Sun className="h-5 w-5 mr-2" />
-                        <span>Light Mode</span>
-                      </>
-                    ) : (
-                      <>
-                        <Moon className="h-5 w-5 mr-2" />
-                        <span>Dark Mode</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
+          <motion.div 
+            className="hidden md:flex items-center space-x-8"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <Link href="/pdfs" className="text-[#a0a0c0] hover:text-white transition-colors">
+              PDFs
+            </Link>
+            <Link href="/notes" className="text-[#a0a0c0] hover:text-white transition-colors">
+              Notes
+            </Link>
+            <Link href="/analytics" className="text-[#a0a0c0] hover:text-white transition-colors">
+              Analytics
+            </Link>
+            <Link href="/collections" className="text-[#a0a0c0] hover:text-white transition-colors">
+              Collections
+            </Link>
+          </motion.div>
+
+          <motion.div 
+            className="flex items-center space-x-4"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <LoginModal />
+            <SignupModal />
+          </motion.div>
+
+          <button
+            className="md:hidden text-[#a0a0c0] hover:text-white transition-colors"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              className="md:hidden"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="px-2 pt-2 pb-3 space-y-1 bg-[#1a1333] rounded-lg mt-2 border border-[#7b4fff]/20">
+                <Link
+                  href="/pdfs"
+                  className="block px-3 py-2 text-[#a0a0c0] hover:text-white hover:bg-[#7b4fff]/10 rounded-md transition-colors"
+                >
+                  PDFs
+                </Link>
+                <Link
+                  href="/notes"
+                  className="block px-3 py-2 text-[#a0a0c0] hover:text-white hover:bg-[#7b4fff]/10 rounded-md transition-colors"
+                >
+                  Notes
+                </Link>
+                <Link
+                  href="/analytics"
+                  className="block px-3 py-2 text-[#a0a0c0] hover:text-white hover:bg-[#7b4fff]/10 rounded-md transition-colors"
+                >
+                  Analytics
+                </Link>
+                <Link
+                  href="/collections"
+                  className="block px-3 py-2 text-[#a0a0c0] hover:text-white hover:bg-[#7b4fff]/10 rounded-md transition-colors"
+                >
+                  Collections
+                </Link>
               </div>
-            </SheetContent>
-          </Sheet>
-
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="relative h-12 w-56 md:h-14 md:w-64">
-              <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Design%20sans%20titre-bawifzMzXdVvhfZKHg2NStNSC2rZTa.png"
-                alt="BrainBase Logo"
-                fill
-                className="object-contain"
-                priority
-              />
-            </div>
-          </Link>
-        </div>
-
-        {/* Desktop Navigation */}
-        <div className="hidden lg:flex items-center space-x-6">
-          <Link href="/" className="text-sm font-medium hover:text-gray-600">
-            Home
-          </Link>
-          <Link href="/pdfs" className="text-sm font-medium hover:text-gray-600">
-            PDFs
-          </Link>
-          <Link href="/notes" className="text-sm font-medium hover:text-gray-600">
-            Notes
-          </Link>
-        </div>
-
-        {/* Auth Buttons or Profile */}
-        <div className="flex items-center gap-4">
-          <RoleSelector />
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="hidden md:flex">
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-
-          {isLoggedIn ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={user?.profileImage} alt={user?.name} />
-                    <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">Profile Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>My Knowledge Bases</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onLogout}>Log out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={onLoginClick}>
-                Log in
-              </Button>
-              <Button onClick={onSignupClick}>Sign up</Button>
-            </>
+            </motion.div>
           )}
-        </div>
-      </div>
-    </nav>
+        </AnimatePresence>
+      </nav>
+    </header>
   )
 }

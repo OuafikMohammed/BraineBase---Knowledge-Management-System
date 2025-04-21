@@ -40,7 +40,6 @@ import {
   Users,
   Share2,
   Check,
-  X,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -54,7 +53,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Import and use the UserRole context
 import { useUserRole } from "@/components/user-role-context"
-
 export default function CollectionPage() {
   const params = useParams()
   const router = useRouter()
@@ -465,6 +463,26 @@ export default function CollectionPage() {
 
   if (!collection) {
     return (
+        <div className="min-h-screen flex flex-col">
+          <Navbar
+            isLoggedIn={isLoggedIn}
+            user={user}
+            onLoginClick={() => {}}
+            onSignupClick={() => {}}
+            onLogout={() => {}}
+            theme={theme}
+            toggleTheme={toggleTheme}
+          />
+
+          <div className="flex-grow flex items-center justify-center">
+            <p>Loading collection...</p>
+          </div>
+        </div>
+    )
+  }
+
+  // Wrap the return statement with ProtectedRoute
+  return (
       <div className="min-h-screen flex flex-col">
         <Navbar
           isLoggedIn={isLoggedIn}
@@ -475,366 +493,321 @@ export default function CollectionPage() {
           theme={theme}
           toggleTheme={toggleTheme}
         />
-
-        <div className="flex-grow flex items-center justify-center">
-          <p>Loading collection...</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar
-        isLoggedIn={isLoggedIn}
-        user={user}
-        onLoginClick={() => {}}
-        onSignupClick={() => {}}
-        onLogout={() => {}}
-        theme={theme}
-        toggleTheme={toggleTheme}
-      />
-
-      <div className="flex-grow container mx-auto py-10 px-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div className="flex items-center">
-            <Button variant="ghost" size="sm" asChild className="mr-2">
-              <a href="/collections">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Collections
-              </a>
-            </Button>
-            <div>
-              <div className="flex items-center">
-                <h1 className="text-3xl font-bold">{collection.name}</h1>
-                <Badge variant="outline" className="ml-2 flex items-center gap-1">
-                  {getVisibilityIcon(collection.visibility)}
-                  <span>{getVisibilityLabel(collection.visibility)}</span>
-                </Badge>
+        <div className="flex-grow container mx-auto py-10 px-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div className="flex items-center">
+              <Button variant="ghost" size="sm" asChild className="mr-2">
+                <a href="/collections">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to Collections
+                </a>
+              </Button>
+              <div>
+                <div className="flex items-center">
+                  <h1 className="text-3xl font-bold">{collection.name}</h1>
+                  <Badge variant="outline" className="ml-2 flex items-center gap-1">
+                    {getVisibilityIcon(collection.visibility)}
+                    <span>{getVisibilityLabel(collection.visibility)}</span>
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground mt-1">{collection.description}</p>
               </div>
-              <p className="text-muted-foreground mt-1">{collection.description}</p>
+            </div>
+
+            <div className="flex gap-2">
+              {isOwner && (
+                <Button variant="outline" onClick={handleShareCollection} className="flex items-center gap-2">
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+              )}
+              {!isOwner && (
+                <div className="flex items-center">
+                  <p className="text-sm text-muted-foreground mr-2">Shared by:</p>
+                  <Avatar className="h-6 w-6 mr-2">
+                    <AvatarImage src={collection.owner.avatar || "/placeholder.svg"} alt={collection.owner.name} />
+                    <AvatarFallback>{collection.owner.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm">{collection.owner.name}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex gap-2">
-            {isOwner && (
-              <Button variant="outline" onClick={handleShareCollection} className="flex items-center gap-2">
-                <Share2 className="h-4 w-4" />
-                Share
-              </Button>
-            )}
-            {!isOwner && (
-              <div className="flex items-center">
-                <p className="text-sm text-muted-foreground mr-2">Shared by:</p>
-                <Avatar className="h-6 w-6 mr-2">
-                  <AvatarImage src={collection.owner.avatar} alt={collection.owner.name} />
-                  <AvatarFallback>{collection.owner.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <span className="text-sm">{collection.owner.name}</span>
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search PDFs..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPDFs.length > 0 ? (
+              filteredPDFs.map((pdf) => (
+                <Card key={pdf.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-start text-base">
+                      <FileText className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                      <span>{pdf.title}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">{pdf.description}</p>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Category: {pdf.category}</span>
+                      <span>Size: {pdf.size}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <span>Added: {pdf.date}</span>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleView(pdf.id)}
+                      className="flex items-center"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      {/* Update the PDF actions based on user role and permissions */}
+                      <DropdownMenuContent align="end">
+                        {(isOwner || userRole === "ADMIN" || userPermission === "EDIT") && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Modify
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeletePdf(pdf.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Remove from Collection
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+                        <DropdownMenuItem onClick={() => handleDownload(pdf.id)}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardFooter>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No PDFs Found</h3>
+                <p className="text-muted-foreground">
+                  {searchQuery
+                    ? "We couldn't find any PDFs matching your search criteria."
+                    : "This collection is empty. Add PDFs from the PDFs page."}
+                </p>
               </div>
             )}
           </div>
-        </div>
 
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search PDFs..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPDFs.length > 0 ? (
-            filteredPDFs.map((pdf) => (
-              <Card key={pdf.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-start text-base">
-                    <FileText className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <span>{pdf.title}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">{pdf.description}</p>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Category: {pdf.category}</span>
-                    <span>Size: {pdf.size}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    <span>Added: {pdf.date}</span>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" size="sm" onClick={() => handleView(pdf.id)} className="flex items-center">
-                    <Eye className="h-4 w-4 mr-2" />
-                    View
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    {/* Update the PDF actions based on user role and permissions */}
-                    <DropdownMenuContent align="end">
-                      {(isOwner || userRole === "ADMIN" || userPermission === "EDIT") && (
-                        <>
-                          <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Modify
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeletePdf(pdf.id)}>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Remove from Collection
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                        </>
+          {collection.sharedWith && collection.sharedWith.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-bold mb-4">Shared With</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {collection.sharedWith.map((share) => {
+                  const userId = typeof share === "object" ? share.userId : share
+                  const permission = typeof share === "object" ? share.permission : "READ"
+                  const sharedUser = mockUsers.find((u) => u.id === userId)
+                  if (!sharedUser) return null
+                  return (
+                    <div key={userId} className="flex items-center p-3 border rounded-md">
+                      <Avatar className="h-10 w-10 mr-3">
+                        <AvatarImage src={sharedUser.avatar || "/placeholder.svg"} alt={sharedUser.name} />
+                        <AvatarFallback>{sharedUser.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{sharedUser.name}</p>
+                        <div className="flex items-center">
+                          <p className="text-xs text-muted-foreground">{sharedUser.email}</p>
+                          <Badge variant="outline" className="ml-2">
+                            {permission === "READ" ? (
+                              <div className="flex items-center">
+                                <Eye className="h-3 w-3 mr-1 text-blue-500" />
+                                <span>Read Only</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center">
+                                <Edit className="h-3 w-3 mr-1 text-green-500" />
+                                <span>Can Edit</span>
+                              </div>
+                            )}
+                          </Badge>
+                        </div>
+                      </div>
+                      {isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto"
+                          onClick={() => {
+                            setSelectedUsers(selectedUsers.filter((id) => id !== userId))
+                            setCollection({
+                              ...collection,
+                              sharedWith: collection.sharedWith.filter((s) =>
+                                typeof s === "object" ? s.userId !== userId : s !== userId,
+                              ),
+                            })
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       )}
-                      <DropdownMenuItem onClick={() => handleDownload(pdf.id)}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardFooter>
-              </Card>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-12">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No PDFs Found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery
-                  ? "We couldn't find any PDFs matching your search criteria."
-                  : "This collection is empty. Add PDFs from the PDFs page."}
-              </p>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
 
-        {collection.sharedWith && collection.sharedWith.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-xl font-bold mb-4">Shared With</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {collection.sharedWith.map((share) => {
-                const userId = typeof share === "object" ? share.userId : share
-                const permission = typeof share === "object" ? share.permission : "READ"
-                const sharedUser = mockUsers.find((u) => u.id === userId)
-                if (!sharedUser) return null
-                return (
-                  <div key={userId} className="flex items-center p-3 border rounded-md">
-                    <Avatar className="h-10 w-10 mr-3">
-                      <AvatarImage src={sharedUser.avatar} alt={sharedUser.name} />
-                      <AvatarFallback>{sharedUser.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{sharedUser.name}</p>
-                      <div className="flex items-center">
-                        <p className="text-xs text-muted-foreground">{sharedUser.email}</p>
-                        <Badge variant="outline" className="ml-2">
-                          {permission === "READ" ? (
-                            <div className="flex items-center">
-                              <Eye className="h-3 w-3 mr-1 text-blue-500" />
-                              <span>Read Only</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center">
-                              <Edit className="h-3 w-3 mr-1 text-green-500" />
-                              <span>Can Edit</span>
-                            </div>
-                          )}
-                        </Badge>
-                      </div>
-                    </div>
-                    {isOwner && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="ml-auto"
-                        onClick={() => {
-                          setSelectedUsers(selectedUsers.filter((id) => id !== userId))
-                          setCollection({
-                            ...collection,
-                            sharedWith: collection.sharedWith.filter((s) =>
-                              typeof s === "object" ? s.userId !== userId : s !== userId,
-                            ),
-                          })
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+        <Footer />
 
-      <Footer />
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent aria-describedby="remove-pdf-description">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove from Collection?</AlertDialogTitle>
+              <AlertDialogDescription id="remove-pdf-description">
+                This will remove the PDF from this collection. The PDF will still be available in your library.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeletePdf}>Remove</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent aria-describedby="remove-pdf-description">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove from Collection?</AlertDialogTitle>
-            <AlertDialogDescription id="remove-pdf-description">
-              This will remove the PDF from this collection. The PDF will still be available in your library.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeletePdf}>Remove</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Modify PDF Dialog */}
-      <Dialog open={showModifyDialog} onOpenChange={setShowModifyDialog}>
-        <DialogContent aria-describedby="modify-pdf-description">
-          <DialogHeader>
-            <DialogTitle>Rename PDF</DialogTitle>
-            <DialogDescription id="modify-pdf-description">Enter a new name for your PDF document.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="pdf-name">PDF Name</Label>
-              <Input id="pdf-name" value={newPdfName} onChange={(e) => setNewPdfName(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModifyDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmModifyPdf}>Save Changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Share Collection Dialog */}
-      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-        <DialogContent className="sm:max-w-md" aria-describedby="share-collection-description">
-          <DialogHeader>
-            <DialogTitle>Share Collection</DialogTitle>
-            <DialogDescription id="share-collection-description">
-              Share your collection with other users.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="search-users">Search Users</Label>
-              <Input
-                id="search-users"
-                placeholder="Search by name or email"
-                value={searchUserQuery}
-                onChange={(e) => setSearchUserQuery(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Permission Level</Label>
-              <div className="flex gap-4">
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    id="permission-read"
-                    name="permission"
-                    value="READ"
-                    checked={sharePermission === "READ"}
-                    onChange={() => setSharePermission("READ")}
-                    className="mr-2"
-                  />
-                  <Label htmlFor="permission-read" className="flex items-center cursor-pointer">
-                    <Eye className="h-4 w-4 mr-1 text-blue-500" />
-                    Read Only
-                  </Label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="radio"
-                    id="permission-edit"
-                    name="permission"
-                    value="EDIT"
-                    checked={sharePermission === "EDIT"}
-                    onChange={() => setSharePermission("EDIT")}
-                    className="mr-2"
-                  />
-                  <Label htmlFor="permission-edit" className="flex items-center cursor-pointer">
-                    <Edit className="h-4 w-4 mr-1 text-green-500" />
-                    Can Edit
-                  </Label>
-                </div>
+        {/* Modify PDF Dialog */}
+        <Dialog open={showModifyDialog} onOpenChange={setShowModifyDialog}>
+          <DialogContent aria-describedby="modify-pdf-description">
+            <DialogHeader>
+              <DialogTitle>Rename PDF</DialogTitle>
+              <DialogDescription id="modify-pdf-description">Enter a new name for your PDF document.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="pdf-name">PDF Name</Label>
+                <Input id="pdf-name" value={newPdfName} onChange={(e) => setNewPdfName(e.target.value)} />
               </div>
             </div>
-            <div className="border rounded-md overflow-hidden">
-              <div className="p-2 bg-muted font-medium">Users</div>
-              <div className="max-h-60 overflow-y-auto">
-                {filteredUsers.length > 0 ? (
-                  filteredUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer"
-                      onClick={() => toggleUserSelection(user.id)}
-                    >
-                      <div className="flex items-center">
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarImage src={user.avatar} alt={user.name} />
-                          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowModifyDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmModifyPdf}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Share Collection Dialog */}
+        <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+          <DialogContent className="sm:max-w-md" aria-describedby="share-collection-description">
+            <DialogHeader>
+              <DialogTitle>Share Collection</DialogTitle>
+              <DialogDescription id="share-collection-description">
+                Share your collection with other users.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="search-users">Search Users</Label>
+                <Input
+                  id="search-users"
+                  placeholder="Search by name or email"
+                  value={searchUserQuery}
+                  onChange={(e) => setSearchUserQuery(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Permission Level</Label>
+                <div className="flex gap-4">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="permission-read"
+                      name="permission"
+                      value="READ"
+                      checked={sharePermission === "READ"}
+                      onChange={() => setSharePermission("READ")}
+                      className="mr-2"
+                    />
+                    <Label htmlFor="permission-read" className="flex items-center cursor-pointer">
+                      <Eye className="h-4 w-4 mr-1 text-blue-500" />
+                      Read Only
+                    </Label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="permission-edit"
+                      name="permission"
+                      value="EDIT"
+                      checked={sharePermission === "EDIT"}
+                      onChange={() => setSharePermission("EDIT")}
+                      className="mr-2"
+                    />
+                    <Label htmlFor="permission-edit" className="flex items-center cursor-pointer">
+                      <Edit className="h-4 w-4 mr-1 text-green-500" />
+                      Can Edit
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <div className="border rounded-md overflow-hidden">
+                <div className="p-2 bg-muted font-medium">Users</div>
+                <div className="max-h-60 overflow-y-auto">
+                  {filteredUsers.length > 0 ? (
+                    filteredUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer"
+                        onClick={() => toggleUserSelection(user.id)}
+                      >
+                        <div className="flex items-center">
+                          <Avatar className="h-8 w-8 mr-2">
+                            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{user.name}</p>
+                            <p className="text-xs text-muted-foreground">{user.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center h-5 w-5 rounded-sm border border-primary">
+                          {selectedUsers.includes(user.id) && <Check className="h-4 w-4 text-primary" />}
                         </div>
                       </div>
-                      <div className="flex items-center h-5 w-5 rounded-sm border border-primary">
-                        {selectedUsers.includes(user.id) && <Check className="h-4 w-4 text-primary" />}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground">No users found</div>
-                )}
-              </div>
-            </div>
-            {selectedUsers.length > 0 && (
-              <div>
-                <Label className="mb-2 block">Selected Users ({selectedUsers.length})</Label>
-                <div className="flex flex-wrap gap-2">
-                  {selectedUsers.map((userId) => {
-                    const user = mockUsers.find((u) => u.id === userId)
-                    if (!user) return null
-                    return (
-                      <Badge key={userId} variant="secondary" className="flex items-center gap-1">
-                        <span>{user.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 ml-1"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleUserSelection(userId)
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    )
-                  })}
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground">No users found</div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowShareDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSharing}>Share Collection</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <div className="flex items-center h-5 w-5 rounded-sm border border-primary">
+                {selectedUsers.includes(user.id) && <Check className="h-4 w-4 text-primary" />}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div> 
   )
 }
