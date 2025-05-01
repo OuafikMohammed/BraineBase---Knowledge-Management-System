@@ -1,11 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { Menu, Home, FileText, FileEdit, Settings, Sun, Moon, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useState } from "react";
+import Link from "next/link";
+import { Menu, Home, FileText, FileEdit, Settings, Sun, Moon, X, LogOut, Database, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,23 +12,23 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import RoleSelector from "@/components/role-selector"
-import { motion, AnimatePresence } from "framer-motion"
-import LoginModal from "@/components/login-modal"
-import SignupModal from "@/components/signup-modal"
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { motion, AnimatePresence } from "framer-motion";
+import LoginModal from "@/components/login-modal";
+import SignupModal from "@/components/signup-modal";
 
 export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, onLogout, theme, toggleTheme }) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg border-b border-[#7b4fff]/20">
       <div className="absolute inset-0 bg-[#0e0a1a]/80" />
-      
+
       <nav className="max-w-7xl mx-auto px-4 relative">
         <div className="flex items-center justify-between h-16">
-          <motion.div 
+          {/* Logo */}
+          <motion.div
             className="flex items-center"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -40,7 +39,8 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
             </Link>
           </motion.div>
 
-          <motion.div 
+          {/* Desktop Navigation Links */}
+          <motion.div
             className="hidden md:flex items-center space-x-8"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -60,29 +60,64 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
             </Link>
           </motion.div>
 
-          <motion.div 
+          {/* Auth Section */}
+          <motion.div
             className="flex items-center space-x-4"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <LoginModal />
-            <SignupModal />
-          </motion.div>
-
-          <button
-            className="md:hidden text-[#a0a0c0] hover:text-white transition-colors"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="h-6 w-6" />
+            {!isLoggedIn ? (
+              <div className="space-x-2">
+                <LoginModal onLogin={onLoginClick} onSignupClick={onSignupClick} />
+                <SignupModal onSignup={onSignupClick} onLoginClick={onLoginClick} />
+              </div>
             ) : (
-              <Menu className="h-6 w-6" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.profileImage} alt={user?.name} />
+                      <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user?.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.location.href = '/knowledge-bases'}>
+                    <Database className="mr-2 h-4 w-4" />
+                    Knowledge Bases
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          </button>
+
+            {/* Mobile Menu Toggle */}
+            <button
+              className="md:hidden text-[#a0a0c0] hover:text-white transition-colors"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </motion.div>
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile Menu */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
@@ -123,5 +158,5 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
         </AnimatePresence>
       </nav>
     </header>
-  )
+  );
 }

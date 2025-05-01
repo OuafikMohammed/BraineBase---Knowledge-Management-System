@@ -1,53 +1,53 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Navbar from "@/components/navbar"
-import HeroSection from "@/components/hero-section"
-import LoginModal from "@/components/login-modal"
-import SignupModal from "@/components/signup-modal"
-import { ThemeProvider } from "@/components/theme-provider"
+import { useState, useEffect } from "react";
+import Navbar from "@/components/navbar";
+import HeroSection from "@/components/hero-section";
+import { ThemeProvider } from "@/components/theme-provider";
 
 export default function Home() {
-  const [isLoginOpen, setIsLoginOpen] = useState(false)
-  const [isSignupOpen, setIsSignupOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser] = useState(null)
-  const [theme, setTheme] = useState("light")
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState("light");
 
-  // Check for saved theme preference
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
+    const savedTheme = localStorage.getItem("theme");
     if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+      setTheme(savedTheme);
+      document.documentElement.classList.toggle("dark", savedTheme === "dark");
     }
-  }, [])
 
-  // Mock login function
-  const handleLogin = (email, password) => {
-    // This would connect to your authentication service
-    console.log("Login attempt with:", email, password)
-    setIsLoggedIn(true)
+    // Check if user is already logged in
+    const token = localStorage.getItem("token");
+    if (token) {
+      setIsLoggedIn(true);
+      console.log("User is already logged in.");
+    }
+  }, []);
+
+  const handleLogin = (data) => {
+    console.log("Handle login called with data:", data);
+    const { token, user } = data;
+    localStorage.setItem("token", token);
+    setIsLoggedIn(true);
     setUser({
-      name: "John",
-      surname: "Doe",
-      email: email,
-      status: "Editor",
+      name: user.name,
+      email: user.email,
+      status: user.user_type || "Viewer",
       profileType: "Standard",
       profileImage: "/placeholder.svg?height=40&width=40",
-    })
-    setIsLoginOpen(false)
-  }
+    });
+    console.log("User logged in successfully:", user);
+  };
 
-  // Mock signup function
-  const handleSignup = (name, email, password) => {
-    // This would connect to your authentication service
-    console.log("Signup attempt with:", name, email, password)
-    const nameParts = name.split(" ")
-    const firstName = nameParts[0]
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : ""
+  const handleSignup = (data) => {
+    console.log("Handle signup called with data:", data);
+    const { name, email } = data;
+    const nameParts = name.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ");
 
-    setIsLoggedIn(true)
+    setIsLoggedIn(true);
     setUser({
       name: firstName,
       surname: lastName,
@@ -55,40 +55,24 @@ export default function Home() {
       status: "Viewer",
       profileType: "Standard",
       profileImage: "/placeholder.svg?height=40&width=40",
-    })
-    setIsSignupOpen(false)
-  }
+    });
+    console.log("User signed up successfully:", { firstName, lastName, email });
+  };
 
-  // Mock Google login function
-  const handleGoogleLogin = () => {
-    // This would connect to your Google authentication service
-    console.log("Google login attempt")
-    setIsLoggedIn(true)
-    setUser({
-      name: "Google",
-      surname: "User",
-      email: "user@gmail.com",
-      status: "Viewer",
-      profileType: "Google",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    })
-    setIsLoginOpen(false)
-    setIsSignupOpen(false)
-  }
-
-  // Mock logout function
   const handleLogout = () => {
-    setIsLoggedIn(false)
-    setUser(null)
-  }
+    setIsLoggedIn(false);
+    setUser(null);
+    localStorage.removeItem("token");
+    console.log("User logged out successfully.");
+  };
 
-  // Theme toggle function
   const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-  }
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    console.log("Theme toggled to:", newTheme);
+  };
 
   return (
     <ThemeProvider>
@@ -96,38 +80,14 @@ export default function Home() {
         <Navbar
           isLoggedIn={isLoggedIn}
           user={user}
-          onLoginClick={() => setIsLoginOpen(true)}
-          onSignupClick={() => setIsSignupOpen(true)}
+          onLoginClick={handleLogin}
+          onSignupClick={handleSignup}
           onLogout={handleLogout}
           theme={theme}
           toggleTheme={toggleTheme}
         />
         <HeroSection />
-
-        {isLoginOpen && (
-          <LoginModal
-            onClose={() => setIsLoginOpen(false)}
-            onLogin={handleLogin}
-            onGoogleLogin={handleGoogleLogin}
-            onSignupClick={() => {
-              setIsLoginOpen(false)
-              setIsSignupOpen(true)
-            }}
-          />
-        )}
-
-        {isSignupOpen && (
-          <SignupModal
-            onClose={() => setIsSignupOpen(false)}
-            onSignup={handleSignup}
-            onGoogleLogin={handleGoogleLogin}
-            onLoginClick={() => {
-              setIsSignupOpen(false)
-              setIsLoginOpen(true)
-            }}
-          />
-        )}
       </main>
     </ThemeProvider>
-  )
+  );
 }
