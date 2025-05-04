@@ -268,7 +268,11 @@ export default function PDFsPage() {
         user={user}
         onLoginClick={() => {}}
         onSignupClick={() => {}}
-        onLogout={() => {}}
+        onLogout={() => {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          router.push("/");
+        }}
         theme={theme}
         toggleTheme={toggleTheme}
       />

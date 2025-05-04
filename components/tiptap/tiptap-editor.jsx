@@ -755,7 +755,7 @@ const TiptapEditor = forwardRef((props, ref) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 onClick={() => {
                   if (props.onSave) {
@@ -769,26 +769,6 @@ const TiptapEditor = forwardRef((props, ref) => {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Save current file (Ctrl+S)</TooltipContent>
-          </Tooltip>
-
-          {/* Global MongoDB Save Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  if (props.onSaveAll) {
-                    props.onSaveAll()
-                    showSaveNotification("All notes saved to MongoDB!")
-                  }
-                }}
-                className="h-8 ml-1"
-              >
-                Save to MongoDB
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Save all changes to database</TooltipContent>
           </Tooltip>
         </div>
 

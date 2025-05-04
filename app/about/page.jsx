@@ -51,7 +51,11 @@ export default function AboutPage() {
         user={user}
         onLoginClick={() => {}}
         onSignupClick={() => {}}
-        onLogout={() => {}}
+        onLogout={() => {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          router.push("/");
+        }}
         theme={theme}
         toggleTheme={toggleTheme}
       />
