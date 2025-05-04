@@ -1,16 +1,11 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Navbar from "@/components/navbar"
+import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, Lock, PaintBucket, Save, Mail } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -19,524 +14,481 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useUserRole } from "@/components/user-role-context"
+import api from "@/lib/api"
+import { sendPasswordResetCode, verifyResetCode, resetPassword } from "@/lib/auth"
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const { role } = useUserRole()
+
+  // Profile State
   const [user, setUser] = useState(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [theme, setTheme] = useState("light")
-  const [isLoading, setIsLoading] = useState(false)
-
-  // Form states
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
-  const [currentPassword, setCurrentPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
+  const [profileErrors, setProfileErrors] = useState({})
+  const [lastSavedName, setLastSavedName] = useState("")
+  const [lastSavedEmail, setLastSavedEmail] = useState("")
 
-  // Add these state variables at the top of the component
-  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false)
-  const [resetStep, setResetStep] = useState("email") // 'email', 'code', 'newPassword'
-  const [resetEmail, setResetEmail] = useState("")
-  const [verificationCode, setVerificationCode] = useState("")
+  // Password Change State
+  const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmNewPassword, setConfirmNewPassword] = useState("")
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [passwordErrors, setPasswordErrors] = useState({})
+  const [passwordStrength, setPasswordStrength] = useState("")
 
-  // Check for saved theme preference and user data
+  // Password Reset State
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false)
+  const [resetStep, setResetStep] = useState("email")
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetCode, setResetCode] = useState("")
+  const [resetPassword, setResetPassword] = useState("")
+  const [confirmResetPassword, setConfirmResetPassword] = useState("")
+  const [resetErrors, setResetErrors] = useState({})
+
+  // Loading State
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Fetch user data on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+    const fetchUserData = async () => {
+      try {
+        const response = await api.get('/profile')
+        setUser(response.data.user)
+        setName(response.data.user.name)
+        setEmail(response.data.user.email)
+        setLastSavedName(response.data.user.name)
+        setLastSavedEmail(response.data.user.email)
+        
+        // Update localStorage with latest user data
+        if (response.data.user.id_profile) {
+          localStorage.setItem('userId', response.data.user.id_profile)
+        }
+        if (response.data.user.user_type) {
+          localStorage.setItem('userRole', response.data.user.user_type)
+        }
+        
+        setIsLoggedIn(true)
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+        router.push('/login')
+      }
     }
+    fetchUserData()
+  }, [router])
 
-    // Mock user data - in a real app, this would come from your auth system
-    const mockUser = {
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "Editor",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=100&width=100",
-    }
-
-    setUser(mockUser)
-    setEmail(mockUser.email)
-    setIsLoggedIn(true)
-  }, [])
-
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
+  // Check password strength
+  const checkPasswordStrength = (password) => {
+    if (password.length === 0) return ""
+    if (password.length < 8) return "Weak"
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumbers = /\d/.test(password)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    const strength = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar].filter(Boolean).length
+    return strength <= 2 ? "Weak" : strength === 3 ? "Medium" : "Strong"
   }
 
-  // Mock save profile function
-  const handleSaveProfile = () => {
+  // Handle Profile Update
+  const handleProfileUpdate = async (e) => {
+    if (e) e.preventDefault()
+    if (!name || !email) return
+
     setIsLoading(true)
+    setProfileErrors({})
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await api.put('/profile', { name, email })
+      setUser(response.data.user)
+      setLastSavedName(name)
+      setLastSavedEmail(email)
+      
+      // Update localStorage with latest user data if provided
+      if (response.data.user.id_profile) {
+        localStorage.setItem('userId', response.data.user.id_profile)
+      }
+      if (response.data.user.user_type) {
+        localStorage.setItem('userRole', response.data.user.user_type)
+      }
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully."
+      })
+    } catch (error) {
+      setProfileErrors(error.response?.data?.errors || { general: 'Failed to update profile' })
+      setName(lastSavedName)
+      setEmail(lastSavedEmail)
+    } finally {
       setIsLoading(false)
-      // Show success message
-      alert("Profile updated successfully")
-    }, 1000)
+    }
   }
 
-  // Mock password change function
-  const handleChangePassword = (e) => {
+  // Handle Password Change
+  const handlePasswordChange = async (e) => {
     e.preventDefault()
+    setIsLoading(true)
+    setPasswordErrors({})
 
-    if (newPassword !== confirmPassword) {
-      alert("New passwords do not match")
+    if (newPassword.length < 8) {
+      setPasswordErrors({ password: ['Password must be at least 8 characters long'] })
+      setIsLoading(false)
       return
     }
 
-    setIsLoading(true)
-
-    // Simulate API call
-    setTimeout(() => {
+    if (checkPasswordStrength(newPassword) === "Weak") {
+      setPasswordErrors({ 
+        password: ['Password is too weak. Include uppercase, lowercase, numbers, and special characters.'] 
+      })
       setIsLoading(false)
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordErrors({ password_confirmation: ['Passwords do not match'] })
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      await api.post('/change-password', {
+        current_password: currentPassword,
+        password: newPassword,
+        password_confirmation: confirmNewPassword
+      })
+
       setCurrentPassword("")
       setNewPassword("")
-      setConfirmPassword("")
-      // Show success message
-      alert("Password changed successfully")
-    }, 1000)
-  }
-
-  // Add these functions
-  const handleSendVerificationCode = () => {
-    setIsLoading(true)
-    // Simulate API call to send verification code
-    setTimeout(() => {
-      setIsLoading(false)
-      setResetStep("code")
-      // Show success message
-      setShowSuccessMessage(true)
-      setTimeout(() => setShowSuccessMessage(false), 3000)
-    }, 1500)
-  }
-
-  const handleVerifyCode = () => {
-    setIsLoading(true)
-    // Simulate API call to verify code
-    setTimeout(() => {
-      setIsLoading(false)
-      setResetStep("newPassword")
-    }, 1500)
-  }
-
-  const handleResetPassword = () => {
-    if (newPassword !== confirmNewPassword) {
-      alert("Passwords do not match")
-      return
-    }
-
-    setIsLoading(true)
-    // Simulate API call to reset password
-    setTimeout(() => {
-      setIsLoading(false)
-      setShowResetPasswordDialog(false)
-      setResetStep("email")
-      setNewPassword("")
       setConfirmNewPassword("")
-      setVerificationCode("")
-      // Show success message
-      alert("Password has been reset successfully")
-    }, 1500)
+      setPasswordStrength("")
+      toast({
+        title: "Password Updated",
+        description: "Your password has been changed successfully.",
+      })
+    } catch (error) {
+      setPasswordErrors(error.response?.data?.errors || { general: 'Failed to change password' })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
-          <p>Please wait while we load your profile</p>
-        </div>
-      </div>
-    )
+  // Handle Password Reset Flow
+  const handlePasswordReset = async () => {
+    setIsLoading(true)
+    setResetErrors({})
+
+    try {
+      if (resetStep === "email") {
+        if (!resetEmail) {
+          setResetErrors({ email: ['Email is required'] })
+          return
+        }
+        await sendPasswordResetCode(resetEmail)
+        setResetStep("code")
+        toast({
+          title: "Code Sent",
+          description: "A reset code has been sent to your email.",
+        })
+      } else if (resetStep === "code") {
+        if (!resetCode) {
+          setResetErrors({ code: ['Reset code is required'] })
+          return
+        }
+        await verifyResetCode(resetEmail, resetCode)
+        setResetStep("newPassword")
+      } else if (resetStep === "newPassword") {
+        if (resetPassword.length < 8) {
+          setResetErrors({ password: ['Password must be at least 8 characters long'] })
+          return
+        }
+
+        if (checkPasswordStrength(resetPassword) === "Weak") {
+          setResetErrors({ 
+            password: ['Password is too weak. Include uppercase, lowercase, numbers, and special characters.'] 
+          })
+          return
+        }
+
+        if (resetPassword !== confirmResetPassword) {
+          setResetErrors({ password_confirmation: ['Passwords do not match'] })
+          return
+        }
+
+        await resetPassword(resetEmail, resetCode, resetPassword, confirmResetPassword)
+        toast({
+          title: "Password Reset",
+          description: "Your password has been reset successfully.",
+        })
+        setShowResetPasswordDialog(false)
+        resetPasswordForm()
+      }
+    } catch (error) {
+      setResetErrors(error.errors || { general: error.message || 'An error occurred' })
+    } finally {
+      setIsLoading(false)
+    }
   }
+
+  const resetPasswordForm = () => {
+    setResetStep("email")
+    setResetEmail("")
+    setResetCode("")
+    setResetPassword("")
+    setConfirmResetPassword("")
+    setResetErrors({})
+  }
+
+  if (!isLoggedIn) return null
 
   return (
-    <div className="min-h-screen">
-      <Navbar
-        isLoggedIn={isLoggedIn}
-        user={user}
-        onLoginClick={() => {}}
-        onSignupClick={() => {}}
-        onLogout={() => router.push("/")}
-        theme={theme}
-        toggleTheme={toggleTheme}
-      />
+    <div className="container mx-auto p-6 max-w-4xl">
+      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+      <div className="space-y-8">
 
-      <div className="container mx-auto py-10 px-4">
-        <h1 className="text-3xl font-bold mb-8">Settings</h1>
+        {/* Profile Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Information</CardTitle>
+            <CardDescription>Update your account profile information.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleProfileUpdate} className="space-y-4">
+              {/* Name Field */}
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={profileErrors.name ? "border-red-500" : ""}
+                />
+                {profileErrors.name && (
+                  <p className="text-red-500 text-sm">{profileErrors.name[0]}</p>
+                )}
+              </div>
 
-        <Tabs defaultValue="profile" className="max-w-4xl mx-auto">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="profile" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>Profile Information</span>
-            </TabsTrigger>
-            <TabsTrigger value="account" className="flex items-center gap-2">
-              <Lock className="h-4 w-4" />
-              <span>Account Settings</span>
-            </TabsTrigger>
-            <TabsTrigger value="theme" className="flex items-center gap-2">
-              <PaintBucket className="h-4 w-4" />
-              <span>Theme</span>
-            </TabsTrigger>
-          </TabsList>
+              {/* Email Field */}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={profileErrors.email ? "border-red-500" : ""}
+                />
+                {profileErrors.email && (
+                  <p className="text-red-500 text-sm">{profileErrors.email[0]}</p>
+                )}
+              </div>
 
-          <TabsContent value="profile" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>View and update your profile information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-6 items-start">
-                  <div className="flex flex-col items-center space-y-2">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={user.profileImage} alt={`${user.name} ${user.surname}`} />
-                      <AvatarFallback>
-                        {user.name.charAt(0)}
-                        {user.surname.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <input
-                      type="file"
-                      id="profile-photo"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => {
-                        // In a real app, this would upload the file to your server
-                        if (e.target.files && e.target.files[0]) {
-                          const reader = new FileReader()
-                          reader.onload = (event) => {
-                            setUser({
-                              ...user,
-                              profileImage: event.target.result,
-                            })
-                          }
-                          reader.readAsDataURL(e.target.files[0])
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => document.getElementById("profile-photo").click()}
-                    >
-                      Change Photo
-                    </Button>
-                  </div>
+              {/* General Error Message */}
+              {profileErrors.general && (
+                <p className="text-red-500 text-sm">{profileErrors.general}</p>
+              )}
 
-                  <div className="grid gap-4 flex-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Name (Nom)</Label>
-                        <Input id="name" defaultValue={user.name} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="surname">Surname (Prenom)</Label>
-                        <Input id="surname" defaultValue={user.surname} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="profile-email">Email</Label>
-                      <Input id="profile-email" defaultValue={user.email} />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <Input id="status" defaultValue={user.status} readOnly />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="profileType">Profile Type</Label>
-                        <Input id="profileType" defaultValue={user.profileType} readOnly />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleSaveProfile} disabled={isLoading} className="ml-auto flex items-center gap-2">
-                  <Save className="h-4 w-4" />
+              {/* Form Actions */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setName(lastSavedName)
+                    setEmail(lastSavedEmail)
+                  }}
+                >
+                  Reset
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || (name === lastSavedName && email === lastSavedEmail)}
+                >
                   {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="account" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
-                <CardDescription>Manage your account email and password</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="account-email">Email</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="account-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button variant="outline">Verify</Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Password</h3>
-                    <Button variant="link" className="p-0 h-auto" onClick={() => setShowResetPasswordDialog(true)}>
-                      Forgot password?
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <Input type="password" value="••••••••" disabled className="bg-muted" />
-                    </div>
-                    <Button onClick={() => setShowResetPasswordDialog(true)}>Change Password</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="theme" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Theme Settings</CardTitle>
-                <CardDescription>Customize the appearance of the application</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <h3 className="text-lg font-medium">Dark Mode</h3>
-                    <p className="text-sm text-muted-foreground">Toggle between light and dark theme</p>
-                  </div>
-                  <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                  <button
-                    className={`block w-full text-left ${theme === "light" ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => {
-                      setTheme("light")
-                      localStorage.setItem("theme", "light")
-                      document.documentElement.classList.remove("dark")
-                    }}
-                  >
-                    <Card className="border">
-                      <CardHeader className="bg-white text-black">
-                        <CardTitle className="text-center">Light Mode</CardTitle>
-                      </CardHeader>
-                      <CardContent className="h-40 bg-white">
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="w-full max-w-xs">
-                            <div className="h-4 w-3/4 bg-gray-200 rounded mb-2"></div>
-                            <div className="h-4 w-full bg-gray-200 rounded mb-2"></div>
-                            <div className="h-4 w-5/6 bg-gray-200 rounded"></div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </button>
-
-                  <button
-                    className={`block w-full text-left ${theme === "dark" ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => {
-                      setTheme("dark")
-                      localStorage.setItem("theme", "dark")
-                      document.documentElement.classList.add("dark")
-                    }}
-                  >
-                    <Card className="border">
-                      <CardHeader className="bg-gray-900 text-white">
-                        <CardTitle className="text-center">Dark Mode</CardTitle>
-                      </CardHeader>
-                      <CardContent className="h-40 bg-gray-900">
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="w-full max-w-xs">
-                            <div className="h-4 w-3/4 bg-gray-700 rounded mb-2"></div>
-                            <div className="h-4 w-full bg-gray-700 rounded mb-2"></div>
-                            <div className="h-4 w-5/6 bg-gray-700 rounded"></div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </button>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <p className="text-sm text-muted-foreground">
-                  Your theme preference will be saved for your next visit.
-                </p>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded flex items-center z-50 animate-in slide-in-from-top">
-          <div className="mr-3">
-            <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
-              <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-          </div>
-          <div>
-            <p className="font-bold">Success!</p>
-            <p className="text-sm">Verification code has been sent to your email.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Password Reset Dialog */}
-      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
-        <DialogContent
-          className="sm:max-w-md"
-          aria-describedby={
-            resetStep === "email"
-              ? "reset-email-description"
-              : resetStep === "code"
-                ? "reset-code-description"
-                : "reset-password-description"
-          }
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {resetStep === "email" && "Reset Password"}
-              {resetStep === "code" && "Enter Verification Code"}
-              {resetStep === "newPassword" && "Create New Password"}
-            </DialogTitle>
-            <DialogDescription
-              id={
-                resetStep === "email"
-                  ? "reset-email-description"
-                  : resetStep === "code"
-                    ? "reset-code-description"
-                    : "reset-password-description"
-              }
-            >
-              {resetStep === "email" && "We'll send a verification code to your email."}
-              {resetStep === "code" && "Enter the code that was sent to your email."}
-              {resetStep === "newPassword" && "Create a new password for your account."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {resetStep === "email" && (
-            <>
-              <div className="grid gap-4 py-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="reset-email">Email</Label>
-                  <Input
-                    id="reset-email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={resetEmail || email}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                  />
-                </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowResetPasswordDialog(false)}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={handleSendVerificationCode} disabled={isLoading}>
-                  {isLoading ? "Sending..." : "Send Code"}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
+            </form>
+          </CardContent>
+        </Card>
 
-          {resetStep === "code" && (
-            <>
-              <div className="grid gap-4 py-4">
-                <div className="flex justify-center mb-4">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Mail className="h-8 w-8 text-primary" />
+        {/* Password Change Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+            <CardDescription>Change your account password.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Current Password</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className={passwordErrors.current_password ? "border-red-500" : ""}
+                />
+                {passwordErrors.current_password && (
+                  <p className="text-red-500 text-sm">{passwordErrors.current_password[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value)
+                    setPasswordStrength(checkPasswordStrength(e.target.value))
+                  }}
+                  className={passwordErrors.password ? "border-red-500" : ""}
+                />
+                {passwordStrength && (
+                  <div className={`text-sm ${
+                    passwordStrength === "Strong" ? "text-green-500" : 
+                    passwordStrength === "Medium" ? "text-yellow-500" : 
+                    "text-red-500"
+                  }`}>
+                    Password Strength: {passwordStrength}
                   </div>
-                </div>
-                <p className="text-center text-sm">
-                  We've sent a verification code to <strong>{resetEmail || email}</strong>
-                </p>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="verification-code">Verification Code</Label>
+                )}
+                {passwordErrors.password && (
+                  <p className="text-red-500 text-sm">{passwordErrors.password[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                <Input
+                  id="confirmNewPassword"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                />
+              </div>
+
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Changing Password..." : "Change Password"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Password Reset Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Reset Password</CardTitle>
+            <CardDescription>Forgot your password? Reset it here.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => setShowResetPasswordDialog(true)} variant="outline">
+              Reset Password
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Password Reset Dialog */}
+        <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+              <DialogDescription>
+                {resetStep === "email" && "Enter your email to receive a reset code."}
+                {resetStep === "code" && "Enter the code sent to your email."}
+                {resetStep === "newPassword" && "Enter your new password."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {resetStep === "email" && (
+                <div className="space-y-2">
+                  <Label htmlFor="resetEmail">Email</Label>
                   <Input
-                    id="verification-code"
-                    placeholder="Enter 6-digit code"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
+                    id="resetEmail"
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className={resetErrors.email ? "border-red-500" : ""}
+                  />
+                  {resetErrors.email && (
+                    <p className="text-red-500 text-sm">{resetErrors.email[0]}</p>
+                  )}
+                </div>
+              )}
+
+              {resetStep === "code" && (
+                <div className="space-y-2">
+                  <Label htmlFor="resetCode">Reset Code</Label>
+                  <Input
+                    id="resetCode"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value)}
+                    className={resetErrors.code ? "border-red-500" : ""}
                     maxLength={6}
                   />
+                  {resetErrors.code && (
+                    <p className="text-red-500 text-sm">{resetErrors.code[0]}</p>
+                  )}
                 </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setResetStep("email")}>
-                  Back
-                </Button>
-                <Button type="button" onClick={handleVerifyCode} disabled={isLoading || verificationCode.length !== 6}>
-                  {isLoading ? "Verifying..." : "Verify Code"}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
+              )}
 
-          {resetStep === "newPassword" && (
-            <>
-              <div className="grid gap-4 py-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Enter new password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="confirm-new-password">Confirm New Password</Label>
-                  <Input
-                    id="confirm-new-password"
-                    type="password"
-                    placeholder="Confirm new password"
-                    value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  />
-                </div>
-              </div>
+              {resetStep === "newPassword" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="resetPassword">New Password</Label>
+                    <Input
+                      id="resetPassword"
+                      type="password"
+                      value={resetPassword}
+                      onChange={(e) => {
+                        setResetPassword(e.target.value)
+                        setPasswordStrength(checkPasswordStrength(e.target.value))
+                      }}
+                      className={resetErrors.password ? "border-red-500" : ""}
+                    />
+                    {passwordStrength && (
+                      <div className={`text-sm ${
+                        passwordStrength === "Strong" ? "text-green-500" : 
+                        passwordStrength === "Medium" ? "text-yellow-500" : 
+                        "text-red-500"
+                      }`}>
+                        Password Strength: {passwordStrength}
+                      </div>
+                    )}
+                    {resetErrors.password && (
+                      <p className="text-red-500 text-sm">{resetErrors.password[0]}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmResetPassword">Confirm New Password</Label>
+                    <Input
+                      id="confirmResetPassword"
+                      type="password"
+                      value={confirmResetPassword}
+                      onChange={(e) => setConfirmResetPassword(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {resetErrors.general && (
+                <p className="text-red-500 text-sm text-center">{resetErrors.general}</p>
+              )}
+
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setResetStep("code")}>
-                  Back
+                <Button variant="outline" onClick={() => setShowResetPasswordDialog(false)}>
+                  Cancel
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleResetPassword}
-                  disabled={isLoading || !newPassword || !confirmNewPassword}
-                >
-                  {isLoading ? "Resetting..." : "Reset Password"}
+                <Button onClick={handlePasswordReset} disabled={isLoading}>
+                  {isLoading ? "Processing..." : "Continue"}
                 </Button>
               </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }

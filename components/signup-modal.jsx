@@ -27,7 +27,7 @@ export default function SignupModal({ onClose, onSignup, onLoginClick }) {
     name: '',
     email: '',
     password: '',
-    profile_type: 'VIEWER',
+    user_type: 'VIEWER'
   })
   
   const [errors, setErrors] = useState({})
@@ -49,42 +49,48 @@ export default function SignupModal({ onClose, onSignup, onLoginClick }) {
   const handleSelectChange = (value) => {
     setFormData({
       ...formData,
-      profile_type: value
+      user_type: value
     })
-    if (errors.profile_type) {
+    if (errors.user_type) {
       setErrors({
         ...errors,
-        profile_type: null
+        user_type: null
       })
     }
   }
 
     
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      setIsLoading(true);
-    
-      try {
-        const response = await api.post('/register', {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          profile_type: formData.profile_type,
-        });
-    
-        localStorage.setItem('token', response.data.token);
-        onSignup(response.data);
-        onClose();
-      } catch (error) {
-        if (error.response?.data?.errors) {
-          setErrors(error.response.data.errors);
-        } else {
-          setErrors({ general: error.response?.data?.message || 'Something went wrong. Please try again.' });
-        }
-      } finally {
-        setIsLoading(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+  
+    try {
+      const response = await api.post('/register', {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        user_type: formData.user_type
+      });
+
+      localStorage.setItem('token', response.data.token);
+      // Store the user's id_profile
+      if (response.data.user && response.data.user.id_profile) {
+        localStorage.setItem('userId', response.data.user.id_profile);
       }
-    };
+      onSignup(response.data);
+      onClose();
+    } catch (error) {
+      if (error.response?.data?.errors) {
+        setErrors(error.response.data.errors);
+      } else {
+        setErrors({
+          general: error.response?.data?.message || 'Something went wrong. Please try again.'
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Dialog>
@@ -156,13 +162,13 @@ export default function SignupModal({ onClose, onSignup, onLoginClick }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile_type" className="text-[#a0a0c0]">Profile Type</Label>
+              <Label htmlFor="user_type" className="text-[#a0a0c0]">Profile Type</Label>
               <Select 
-                value={formData.profile_type} 
+                value={formData.user_type} 
                 onValueChange={handleSelectChange}
               >
                 <SelectTrigger className={`bg-[#0e0a1a]/50 border-[#7b4fff]/30 text-white ${
-                  errors.profile_type ? 'border-red-500' : ''
+                  errors.user_type ? 'border-red-500' : ''
                 }`}>
                   <SelectValue placeholder="Select profile type" />
                 </SelectTrigger>
@@ -172,7 +178,7 @@ export default function SignupModal({ onClose, onSignup, onLoginClick }) {
                   <SelectItem value="ADMIN" className="hover:bg-[#7b4fff]/20">Admin</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.profile_type && <p className="text-red-500 text-sm">{errors.profile_type[0]}</p>}
+              {errors.user_type && <p className="text-red-500 text-sm">{errors.user_type[0]}</p>}
             </div>
 
             {errors.general && (

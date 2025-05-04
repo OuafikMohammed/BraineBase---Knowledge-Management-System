@@ -29,6 +29,13 @@ export default function Home() {
     console.log("Handle login called with data:", data);
     const { token, user } = data;
     localStorage.setItem("token", token);
+    // Store user role and id_profile
+    if (user) {
+      localStorage.setItem("userRole", user.user_type || "VIEWER");
+      if (user.id_profile) {
+        localStorage.setItem("userId", user.id_profile);
+      }
+    }
     setIsLoggedIn(true);
     setUser({
       name: user.name,
@@ -36,33 +43,43 @@ export default function Home() {
       status: user.user_type || "Viewer",
       profileType: "Standard",
       profileImage: "/placeholder.svg?height=40&width=40",
+      id_profile: user.id_profile
     });
     console.log("User logged in successfully:", user);
   };
 
   const handleSignup = (data) => {
     console.log("Handle signup called with data:", data);
-    const { name, email } = data;
-    const nameParts = name.split(" ");
+    const { user } = data;
+    const nameParts = user.name.split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ");
+
+    // Store user role and id_profile
+    localStorage.setItem("userRole", user.user_type || "VIEWER");
+    if (user.id_profile) {
+      localStorage.setItem("userId", user.id_profile);
+    }
 
     setIsLoggedIn(true);
     setUser({
       name: firstName,
       surname: lastName,
-      email: email,
-      status: "Viewer",
+      email: user.email,
+      status: user.user_type || "Viewer",
       profileType: "Standard",
       profileImage: "/placeholder.svg?height=40&width=40",
+      id_profile: user.id_profile
     });
-    console.log("User signed up successfully:", { firstName, lastName, email });
+    console.log("User signed up successfully:", { firstName, lastName, email: user.email });
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUser(null);
     localStorage.removeItem("token");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userId");
     console.log("User logged out successfully.");
   };
 

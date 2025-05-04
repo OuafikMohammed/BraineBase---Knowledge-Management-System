@@ -2,26 +2,44 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useUserRole } from "@/components/user-role-context"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Plus, FileText, Briefcase } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Plus, FolderPlus, File, Folder, ChevronRight } from "lucide-react"
 
 export default function NotesPage() {
   const router = useRouter()
+  const { role, isAdmin, isEditor } = useUserRole()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
   const [theme, setTheme] = useState("dark")
-  const [vaults, setVaults] = useState([
-    { id: 1, name: "Personal Notes", description: "My personal notes and ideas", createdAt: "2023-11-15" },
-    { id: 2, name: "Work Projects", description: "Documentation and notes for work projects", createdAt: "2023-12-01" },
-  ])
-  const [newVaultName, setNewVaultName] = useState("")
+  
+  // Vault states
+  const [vaults, setVaults] = useState([])
+  const [selectedVault, setSelectedVault] = useState(null)
   const [isCreatingVault, setIsCreatingVault] = useState(false)
+  const [newVaultName, setNewVaultName] = useState("")
+  const [newVaultDescription, setNewVaultDescription] = useState("")
 
-  // Check for saved theme preference and user data
+  // Note states
+  const [notes, setNotes] = useState([])
+  const [isCreatingNote, setIsCreatingNote] = useState(false)
+  const [newNoteTitle, setNewNoteTitle] = useState("")
+  const [newNoteContent, setNewNoteContent] = useState("")
+
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme")
     if (savedTheme) {
@@ -29,191 +47,255 @@ export default function NotesPage() {
       document.documentElement.classList.toggle("dark", savedTheme === "dark")
     }
 
-    // Check if user is logged in (mock implementation)
-    const mockUser = {
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "Editor",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    }
-
-    // In a real app, you would check if the user is logged in
-    const isUserLoggedIn = true // Mock value
-
-    if (isUserLoggedIn) {
-      setUser(mockUser)
+    // Get user data from localStorage
+    const token = localStorage.getItem("token")
+    const savedUser = localStorage.getItem("user")
+    if (token && savedUser) {
+      const userData = JSON.parse(savedUser)
+      setUser(userData)
       setIsLoggedIn(true)
+      
+      // Load user's vaults
+      const savedVaults = localStorage.getItem(`vaults_${userData.id}`)
+      if (savedVaults) {
+        setVaults(JSON.parse(savedVaults))
+      }
+    } else {
+      router.push("/")
     }
-  }, [])
-
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-  }
+  }, [router])
 
   // Create new vault
   const handleCreateVault = () => {
     if (!newVaultName.trim()) {
-      alert("Please enter a name for your vault")
+      alert("Please enter a vault name")
       return
     }
 
     const newVault = {
-      id: vaults.length > 0 ? Math.max(...vaults.map((v) => v.id)) + 1 : 1,
-      name: newVaultName,
-      description: "A new vault for your notes",
-      createdAt: new Date().toISOString().split("T")[0],
+      id: Date.now(),
+      name: newVaultName.trim(),
+      description: newVaultDescription.trim(),
+      createdAt: new Date().toISOString(),
+      userId: user.id,
+      notes: []
     }
 
-    setVaults([...vaults, newVault])
+    const updatedVaults = [...vaults, newVault]
+    setVaults(updatedVaults)
+    localStorage.setItem(`vaults_${user.id}`, JSON.stringify(updatedVaults))
+    
     setNewVaultName("")
+    setNewVaultDescription("")
     setIsCreatingVault(false)
-
-    // Navigate to the new vault
-    router.push(`/notes/${newVault.id}`)
   }
 
-  // Open vault
-  const handleOpenVault = (vaultId) => {
-    router.push(`/notes/${vaultId}`)
+  // Create new note
+  const handleCreateNote = () => {
+    if (!selectedVault) {
+      alert("Please select a vault first")
+      return
+    }
+
+    if (!newNoteTitle.trim()) {
+      alert("Please enter a note title")
+      return
+    }
+
+    const newNote = {
+      id: Date.now(),
+      title: newNoteTitle.trim(),
+      content: newNoteContent.trim(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+
+    const updatedVaults = vaults.map(vault => {
+      if (vault.id === selectedVault.id) {
+        return {
+          ...vault,
+          notes: [...vault.notes, newNote]
+        }
+      }
+      return vault
+    })
+
+    setVaults(updatedVaults)
+    localStorage.setItem(`vaults_${user.id}`, JSON.stringify(updatedVaults))
+    
+    setNewNoteTitle("")
+    setNewNoteContent("")
+    setIsCreatingNote(false)
   }
 
   return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Navbar
-          isLoggedIn={isLoggedIn}
-          user={user}
-          onLoginClick={() => {}}
-          onSignupClick={() => {}}
-          onLogout={() => {}}
-          theme={theme}
-          toggleTheme={toggleTheme}
-        />
+    <div className="min-h-screen">
+      <Navbar
+        isLoggedIn={isLoggedIn}
+        user={user}
+        onLogout={() => router.push("/")}
+        theme={theme}
+        toggleTheme={() => {
+          const newTheme = theme === "light" ? "dark" : "light"
+          setTheme(newTheme)
+          localStorage.setItem("theme", newTheme)
+          document.documentElement.classList.toggle("dark", newTheme === "dark")
+        }}
+      />
 
-        <div className="flex-grow container mx-auto py-10 px-4 animate-fade-in">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 animate-slide-down">
-            <div>
-              <h1 className="text-3xl font-bold text-text-primary">Notes</h1>
-              <p className="text-text-secondary mt-1">Create and manage your notes in vaults</p>
-            </div>
-
-            <Button
-              onClick={() => setIsCreatingVault(true)}
-              className="bg-gradient-create hover:shadow-lg hover:shadow-create/30 transition-all duration-300 flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create Vault
-            </Button>
+      <div className="container mx-auto py-10 px-4">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">My Notes</h1>
+            <p className="text-muted-foreground mt-1">
+              Organize your notes in vaults
+            </p>
           </div>
-
-          {isCreatingVault ? (
-            <Card className="max-w-md mx-auto bg-surface border-border/50 shadow-lg animate-slide-up">
-              <CardHeader>
-                <CardTitle className="text-text-primary">Create New Vault</CardTitle>
-                <CardDescription className="text-text-secondary">
-                  A vault is a secure space to store and organize your notes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Vault Name"
-                      value={newVaultName}
-                      onChange={(e) => setNewVaultName(e.target.value)}
-                      className="bg-background border-border/50 text-text-primary focus:border-accent focus:ring-accent"
-                    />
-                  </div>
+          <Dialog open={isCreatingVault} onOpenChange={setIsCreatingVault}>
+            <DialogTrigger asChild>
+              <Button>
+                <FolderPlus className="h-4 w-4 mr-2" />
+                New Vault
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Vault</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={newVaultName}
+                    onChange={(e) => setNewVaultName(e.target.value)}
+                    placeholder="Enter vault name"
+                  />
                 </div>
-              </CardContent>
-              <CardFooter className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreatingVault(false)}
-                  className="border-border/50 text-text-secondary hover:text-text-primary hover:bg-accent/20"
-                >
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={newVaultDescription}
+                    onChange={(e) => setNewVaultDescription(e.target.value)}
+                    placeholder="Enter vault description"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreatingVault(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleCreateVault}
-                  className="bg-gradient-create hover:shadow-lg hover:shadow-create/30 transition-all duration-300"
-                >
-                  Create Vault
-                </Button>
-              </CardFooter>
-            </Card>
-          ) : (
-            <>
-              {vaults.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {vaults.map((vault, index) => (
-                    <Card
-                      key={vault.id}
-                      className="card-gradient cursor-pointer animate-fade-in"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                      onClick={() => handleOpenVault(vault.id)}
-                    >
-                      <CardHeader>
-                        <CardTitle className="flex items-center text-text-primary">
-                          <Briefcase className="h-5 w-5 mr-2 text-accent" />
-                          {vault.name}
-                        </CardTitle>
-                        <CardDescription className="text-text-secondary">Created on {vault.createdAt}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-text-secondary">{vault.description}</p>
-                      </CardContent>
-                      <CardFooter>
-                        <Button
-                          variant="outline"
-                          className="w-full border-border/50 text-text-secondary hover:text-text-primary hover:bg-accent/20 hover:border-accent"
-                        >
-                          Open Vault
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-
-                  <Card
-                    className="cursor-pointer border-dashed border-border/50 hover:border-accent hover:shadow-lg hover:shadow-accent/20 transition-all duration-300 flex flex-col items-center justify-center p-6 bg-surface/50 animate-fade-in"
-                    style={{ animationDelay: `${vaults.length * 0.1}s` }}
-                    onClick={() => setIsCreatingVault(true)}
-                  >
-                    <Plus className="h-12 w-12 text-accent mb-4" />
-                    <p className="text-lg font-medium text-text-primary">Create New Vault</p>
-                    <p className="text-sm text-text-secondary text-center mt-2">
-                      Create a new space to organize your notes
-                    </p>
-                  </Card>
-                </div>
-              ) : (
-                <div className="text-center py-12 animate-fade-in">
-                  <div className="bg-surface rounded-full p-4 inline-block mb-4">
-                    <FileText className="h-8 w-8 text-accent" />
-                  </div>
-                  <h3 className="text-xl font-medium mb-2 text-text-primary">No Vaults Yet</h3>
-                  <p className="text-text-secondary mb-6 max-w-md mx-auto">
-                    Create your first vault to start organizing your notes in a Notion-like workspace.
-                  </p>
-                  <Button
-                    onClick={() => setIsCreatingVault(true)}
-                    className="bg-gradient-create hover:shadow-lg hover:shadow-create/30 transition-all duration-300"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Vault
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+                <Button onClick={handleCreateVault}>Create Vault</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Footer />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {vaults.map((vault) => (
+            <Card
+              key={vault.id}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => setSelectedVault(vault)}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Folder className="h-5 w-5" />
+                  {vault.name}
+                </CardTitle>
+                <CardDescription>{vault.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  {vault.notes.length} notes
+                </p>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Created {new Date(vault.createdAt).toLocaleDateString()}
+                </p>
+                <ChevronRight className="h-4 w-4" />
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+
+        {selectedVault && (
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">{selectedVault.name}</h2>
+                <p className="text-muted-foreground">{selectedVault.description}</p>
+              </div>
+              <Dialog open={isCreatingNote} onOpenChange={setIsCreatingNote}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Note
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Note</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="title">Title</Label>
+                      <Input
+                        id="title"
+                        value={newNoteTitle}
+                        onChange={(e) => setNewNoteTitle(e.target.value)}
+                        placeholder="Enter note title"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content">Content</Label>
+                      <Textarea
+                        id="content"
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        placeholder="Enter note content"
+                        rows={5}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsCreatingNote(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateNote}>Create Note</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {selectedVault.notes.map((note) => (
+                <Card key={note.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <File className="h-5 w-5" />
+                      {note.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-3">
+                      {note.content}
+                    </p>
+                  </CardContent>
+                  <CardFooter>
+                    <p className="text-sm text-muted-foreground">
+                      Last updated {new Date(note.updatedAt).toLocaleDateString()}
+                    </p>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+      <Footer />
+    </div>
   )
 }

@@ -47,22 +47,26 @@ export default function LoginModal({ onLogin, onSignupClick }) {
 
     try {
       const response = await api.post("/login", formData);
-      setShowSuccess(true);
-      // Show success message for 1.5s before closing
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      onLogin(response.data);
-      setIsOpen(false);
-    } catch (error) {
-      console.error("Login error:", error.response?.data || error.message);
-      if (error.response?.data?.errors) {
-        setErrors(error.response.data.errors);
-      } else {
-        setErrors({
-          general: error.response?.data?.message || "Invalid credentials. Please try again.",
-        });
+      // Store the token
+      localStorage.setItem('token', response.data.token)
+      // Store user role and id_profile
+      if (response.data.user) {
+        localStorage.setItem('userRole', response.data.user.user_type || 'VIEWER')
+        if (response.data.user.id_profile) {
+          localStorage.setItem('userId', response.data.user.id_profile)
+        }
       }
+      onLogin(response.data)
+      setShowSuccess(true)
+      setTimeout(() => {
+        setIsOpen(false)
+      }, 1500)
+    } catch (error) {
+      setErrors({
+        general: error.response?.data?.message || "Invalid credentials. Please try again."
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   };
 

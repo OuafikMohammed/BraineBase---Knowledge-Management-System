@@ -76,6 +76,7 @@
     "framer-motion": "latest",
     "highlight.js": "latest",
     "input-otp": "1.4.1",
+    "js-cookie": "^3.0.5",
     "jspdf": "latest",
     "lowlight": "latest",
     "lucide-react": "^0.454.0",
