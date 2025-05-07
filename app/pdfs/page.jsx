@@ -56,83 +56,19 @@ import { useRouter } from "next/navigation"
 
 // Import and use the UserRole context
 import { useUserRole } from "@/components/user-role-context"
+import { toast } from "@/components/ui/use-toast"
+import api from "@/lib/api"
 
 export default function PDFsPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser] = useState(null)
-  const [theme, setTheme] = useState("light")
+  const [pdfs, setPdfs] = useState([])
+  const [collections, setCollections] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
+  const [collectionSearchQuery, setCollectionSearchQuery] = useState("")
   const router = useRouter()
 
-  // Add this near the top of the component
-  const { role, isAdmin, isEditor, canEditPdf, canDeletePdf } = useUserRole()
-
-  // Mock PDF data
-  const [pdfs, setPdfs] = useState([
-    {
-      id: 1,
-      title: "Knowledge Base Setup Guide",
-      description: "A comprehensive guide to setting up your knowledge base",
-      date: "2023-12-15",
-      size: "2.4 MB",
-      category: "Guides",
-      addedBy: "user123",
-    },
-    {
-      id: 2,
-      title: "Content Organization Best Practices",
-      description: "Learn how to organize your content effectively",
-      date: "2023-11-20",
-      size: "1.8 MB",
-      category: "Best Practices",
-      addedBy: "user456",
-    },
-    {
-      id: 3,
-      title: "User Management Manual",
-      description: "How to manage users and permissions in your knowledge base",
-      date: "2023-10-05",
-      size: "3.2 MB",
-      category: "Manuals",
-      addedBy: "user123",
-    },
-    {
-      id: 4,
-      title: "API Documentation",
-      description: "Technical documentation for the BrainBase API",
-      date: "2023-09-12",
-      size: "5.1 MB",
-      category: "Technical",
-      addedBy: "user789",
-    },
-    {
-      id: 5,
-      title: "Content Migration Guide",
-      description: "How to migrate content from other platforms to BrainBase",
-      date: "2023-08-30",
-      size: "1.5 MB",
-      category: "Guides",
-      addedBy: "user456",
-    },
-    {
-      id: 6,
-      title: "Analytics and Reporting",
-      description: "Understanding BrainBase analytics and reporting features",
-      date: "2023-07-22",
-      size: "2.7 MB",
-      category: "Features",
-      addedBy: "user789",
-    },
-  ])
-
-  // Add these state variables
-  const [collections, setCollections] = useState([
-    { id: 1, name: "Favorites" },
-    { id: 2, name: "Work Documents" },
-    { id: 3, name: "Personal" },
-  ])
-  const [collectionSearchQuery, setCollectionSearchQuery] = useState("")
+  // States for dialogs
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [pdfToDelete, setPdfToDelete] = useState(null)
   const [showModifyDialog, setShowModifyDialog] = useState(false)
@@ -142,7 +78,9 @@ export default function PDFsPage() {
   const [newCollectionName, setNewCollectionName] = useState("")
   const [pdfToAddToCollection, setPdfToAddToCollection] = useState(null)
 
-  // Get unique categories
+  const { role, isAdmin, isEditor, canEditPdf, canDeletePdf } = useUserRole()
+
+  // Get unique categories from PDFs
   const categories = ["all", ...new Set(pdfs.map((pdf) => pdf.category))]
 
   // Filtered PDFs based on search and category
@@ -150,131 +88,171 @@ export default function PDFsPage() {
     (pdf) =>
       (activeCategory === "all" || pdf.category === activeCategory) &&
       (pdf.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pdf.description.toLowerCase().includes(searchQuery.toLowerCase())),
+        pdf.description.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  // Check for saved theme preference and user data
+  // Fetch PDFs and collections on component mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const [pdfResponse, collectionsResponse] = await Promise.all([
+          api.get("/pdfs"),
+          api.get("/collections")
+        ])
+
+        if (pdfResponse.data) {
+          setPdfs(pdfResponse.data)
+        }
+
+        if (collectionsResponse.data) {
+          setCollections(collectionsResponse.data)
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load data",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    // Check if user is logged in (mock implementation)
-    const mockUser = {
-      id: "user123",
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "Editor",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    }
+    fetchData()
+  }, []) // Empty dependency array means this effect runs once on mount
 
-    // In a real app, you would check if the user is logged in
-    const isUserLoggedIn = true // Mock value
-
-    if (isUserLoggedIn) {
-      setUser(mockUser)
-      setIsLoggedIn(true)
-    }
-  }, [])
-
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-  }
-
-  // Mock download function
-  const handleDownload = (pdfId) => {
-    const pdf = pdfs.find((p) => p.id === pdfId)
-    alert(`Downloading: ${pdf.title}`)
-  }
-
-  // Mock view function
-  const handleView = (pdfId) => {
-    const pdf = pdfs.find((p) => p.id === pdfId)
-    alert(`Viewing: ${pdf.title}`)
-  }
-
-  // Mock upload function
-  const handleUpload = () => {
-    alert("Upload functionality would be implemented here")
-  }
-
-  // Add these handler functions
-  const handleDeletePdf = (pdfId) => {
+  // Handler functions for CRUD operations
+  const handleDeletePdf = async (pdfId) => {
     setPdfToDelete(pdfId)
     setShowDeleteDialog(true)
   }
 
-  const confirmDeletePdf = () => {
-    // Filter out the deleted PDF
-    const updatedPdfs = pdfs.filter((pdf) => pdf.id !== pdfToDelete)
-    setPdfs(updatedPdfs)
-    setShowDeleteDialog(false)
-    setPdfToDelete(null)
+  const confirmDeletePdf = async () => {
+    try {
+      const response = await api.delete(`/pdfs/${pdfToDelete}`)
+
+      if (response.status === 200) {
+        setPdfs(prev => prev.filter(pdf => pdf.id !== pdfToDelete))
+        setShowDeleteDialog(false)
+        setPdfToDelete(null)
+        toast({
+          description: "PDF deleted successfully"
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete PDF",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleModifyPdf = (pdfId) => {
-    const pdf = pdfs.find((p) => p.id === pdfId)
+    const pdf = pdfs.find(p => p.id === pdfId)
     setPdfToModify(pdfId)
     setNewPdfName(pdf.title)
     setShowModifyDialog(true)
   }
 
-  const confirmModifyPdf = () => {
-    // Update the PDF name
-    const updatedPdfs = pdfs.map((pdf) => (pdf.id === pdfToModify ? { ...pdf, title: newPdfName } : pdf))
-    setPdfs(updatedPdfs)
-    setShowModifyDialog(false)
-    setPdfToModify(null)
+  const confirmModifyPdf = async () => {
+    try {
+      const response = await api.put(`/pdfs/${pdfToModify}`, { title: newPdfName })
+
+      if (response.status === 200) {
+        const updatedPdf = response.data
+        setPdfs(prev => prev.map(pdf => pdf.id === pdfToModify ? updatedPdf : pdf))
+        setShowModifyDialog(false)
+        setPdfToModify(null)
+        toast({
+          description: "PDF renamed successfully"
+        })
+      }
+    } catch (error) {
+      console.error("Error modifying PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to rename PDF",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleCreateCollection = (pdfId) => {
+  const handleCreateCollection = async (pdfId) => {
     setPdfToAddToCollection(pdfId)
     setShowCreateCollectionDialog(true)
   }
 
-  const confirmCreateCollection = () => {
-    // Create new collection
-    const newCollection = {
-      id: Math.max(...collections.map((c) => c.id)) + 1,
-      name: newCollectionName,
+  const confirmCreateCollection = async () => {
+    try {
+      const response = await api.post("/collections", {
+        name: newCollectionName,
+        visibility: "private"
+      })
+
+      if (response.status === 200) {
+        const newCollection = response.data
+        setCollections([...collections, newCollection])
+        toast({
+          description: "Collection created successfully"
+        })
+        
+        // Add PDF to the new collection if we have one pending
+        if (pdfToAddToCollection) {
+          await handleSaveToCollection(pdfToAddToCollection, newCollection.id)
+        }
+      }
+    } catch (error) {
+      console.error("Error creating collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create collection",
+        variant: "destructive"
+      })
+    } finally {
+      setShowCreateCollectionDialog(false)
+      setNewCollectionName("")
+      setPdfToAddToCollection(null)
     }
-    setCollections([...collections, newCollection])
-
-    // Save PDF to this collection (in a real app, you'd have a many-to-many relationship)
-    alert(`PDF saved to new collection: ${newCollectionName}`)
-
-    setShowCreateCollectionDialog(false)
-    setNewCollectionName("")
-    setPdfToAddToCollection(null)
   }
 
-  const handleSaveToCollection = (pdfId, collectionId) => {
-    const collection = collections.find((c) => c.id === collectionId)
-    alert(`PDF saved to collection: ${collection.name}`)
+  const handleSaveToCollection = async (pdfId, collectionId) => {
+    try {
+      const response = await api.post(`/collections/${collectionId}/pdfs/${pdfId}`)
+
+      if (response.status === 200) {
+        toast({
+          description: "PDF added to collection successfully"
+        })
+      }
+    } catch (error) {
+      console.error("Error adding PDF to collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add PDF to collection",
+        variant: "destructive"
+      })
+    }
   }
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
-        isLoggedIn={isLoggedIn}
-        user={user}
+        isLoggedIn={true}
+        user={null}
         onLoginClick={() => {}}
         onSignupClick={() => {}}
         onLogout={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          router.push("/");
+          localStorage.removeItem("token")
+          localStorage.removeItem("userId")
+          localStorage.removeItem("userRole")
+          router.push("/")
         }}
-        theme={theme}
-        toggleTheme={toggleTheme}
+        theme="light"
+        toggleTheme={() => {}}
       />
 
       <div className="flex-grow container mx-auto py-10 px-4">
@@ -284,25 +262,23 @@ export default function PDFsPage() {
             <p className="text-muted-foreground mt-1">Manage and access your PDF documents</p>
           </div>
 
-          {/* Update the upload button to be conditionally rendered based on role */}
           <div className="flex gap-2">
             {(isAdmin || isEditor) && (
-              <Button onClick={handleUpload} className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Upload PDF
-              </Button>
-            )}
-            {(isAdmin || isEditor) && (
-              <Button variant="outline" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Create Collection
-              </Button>
+              <>
+                <Button onClick={() => {}} className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload PDF
+                </Button>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create Collection
+                </Button>
+              </>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-20">
               <div className="space-y-4">
@@ -358,7 +334,6 @@ export default function PDFsPage() {
             </div>
           </div>
 
-          {/* Main content */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="grid" className="w-full">
               <div className="flex justify-between items-center mb-4">
@@ -394,7 +369,7 @@ export default function PDFsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleView(pdf.id)}
+                            onClick={() => {}}
                             className="flex items-center"
                           >
                             <Eye className="h-4 w-4 mr-2" />
@@ -406,9 +381,8 @@ export default function PDFsPage() {
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            {/* Update the PDF actions based on user role */}
                             <DropdownMenuContent align="end">
-                              {(isAdmin || (isEditor && pdf.addedBy === user?.id)) && (
+                              {(isAdmin || (isEditor && pdf.addedBy === null)) && (
                                 <>
                                   <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
                                     <Edit className="h-4 w-4 mr-2" />
@@ -455,7 +429,7 @@ export default function PDFsPage() {
                                 </DropdownMenuPortal>
                               </DropdownMenuSub>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleDownload(pdf.id)}>
+                              <DropdownMenuItem onClick={() => {}}>
                                 <Download className="h-4 w-4 mr-2" />
                                 Download
                               </DropdownMenuItem>
@@ -502,10 +476,10 @@ export default function PDFsPage() {
                           <span className="text-sm">{pdf.size}</span>
                         </div>
                         <div className="col-span-2 flex items-center space-x-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleView(pdf.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => {}}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDownload(pdf.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => {}}>
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -527,7 +501,6 @@ export default function PDFsPage() {
 
       <Footer />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -545,7 +518,6 @@ export default function PDFsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modify PDF Dialog */}
       <Dialog open={showModifyDialog} onOpenChange={setShowModifyDialog}>
         <DialogContent aria-describedby="pdf-rename-description">
           <DialogHeader>
@@ -567,7 +539,6 @@ export default function PDFsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Collection Dialog */}
       <Dialog open={showCreateCollectionDialog} onOpenChange={setShowCreateCollectionDialog}>
         <DialogContent aria-describedby="collection-create-description">
           <DialogHeader>

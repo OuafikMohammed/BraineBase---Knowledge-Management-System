@@ -89,6 +89,8 @@ export default function VaultPage() {
   const [isAddingTag, setIsAddingTag] = useState(false)
   const [draggedItem, setDraggedItem] = useState(null)
   const [dragOverItem, setDragOverItem] = useState(null)
+  const [searchTags, setSearchTags] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
 
   // Add this near the top of the component
   const { role, isAdmin, isEditor } = useUserRole()
@@ -290,6 +292,33 @@ export default function VaultPage() {
   const getChildItems = (folderId) => {
     if (!vault) return []
     return vault.items.filter((item) => item.id_parent === folderId)
+  }
+
+  // Handle file/folder selection
+  const handleItemSelection = (item) => {
+    if (item.element_type === "FOLDER") {
+      toggleFolder(item.id_element);
+    } else {
+      // If we have unsaved changes in the current file, save them first
+      if (contentChanged && activeItem) {
+        handleSaveContent(true);
+      }
+      
+      // Set the new active item
+      setActiveItem(item);
+      
+      // Reset content change tracking
+      setContentChanged(false);
+      
+      // If we have an editor reference, update its content
+      if (editorRef.current) {
+        editorRef.current.setContent(item.content_html || "");
+      }
+      
+      // Update tags and versions
+      setTags(item.tags || []);
+      setNoteVersions(item.versions || []);
+    }
   }
 
   // Open create dialog for a specific parent folder
@@ -522,7 +551,7 @@ export default function VaultPage() {
   }
 
   // Restore a previous version
-  const restoreVersion = (version) => {
+  const restoreVersion = async (version) => {
     if (
       !window.confirm(
         "Are you sure you want to restore this version? Your current changes will be saved as a new version.",
@@ -531,27 +560,22 @@ export default function VaultPage() {
       return
     }
 
-    if (editorRef.current) {
-      // Save current content as a version
-      const currentContent = editorRef.current.getContent()
-      const newVersion = {
-        id: noteVersions.length > 0 ? Math.max(...noteVersions.map((v) => v.id)) + 1 : 1,
-        date: new Date().toISOString(),
-        content: currentContent,
+    try {
+      // Call API to restore version
+      const updatedElement = await vaultService.restoreVersion(
+        activeItem.id_element,
+        version.id
+      )
+
+      // Update the editor with the restored content
+      if (editorRef.current) {
+        editorRef.current.setContent(version.content)
       }
 
-      // Update the editor with the selected version content
-      editorRef.current.setContent(version.content)
-
-      // Update the item
+      // Update the vault items
       const updatedItems = vault.items.map((item) => {
         if (item.id_element === activeItem.id_element) {
-          return {
-            ...item,
-            content_html: version.content,
-            last_edited: new Date().toISOString(),
-            versions: [...(item.versions || []), newVersion],
-          }
+          return updatedElement
         }
         return item
       })
@@ -562,17 +586,19 @@ export default function VaultPage() {
       })
 
       // Update the active item
-      const updatedActiveItem = updatedItems.find((item) => item.id_element === activeItem.id_element)
-      setActiveItem(updatedActiveItem)
-
-      // Update versions
-      if (updatedActiveItem.versions) {
-        setNoteVersions(updatedActiveItem.versions)
-      }
+      setActiveItem(updatedElement)
+      setNoteVersions(updatedElement.versions || [])
 
       toast({
         title: "Version restored",
         description: `Version from ${formatDate(version.date)} has been restored.`,
+      })
+    } catch (error) {
+      console.error("Error restoring version:", error)
+      toast({
+        title: "Error",
+        description: "Failed to restore version",
+        variant: "destructive",
       })
     }
   }
@@ -757,6 +783,50 @@ export default function VaultPage() {
     )
   }, [vault, searchQuery])
 
+  // Search by tags
+  const handleTagSearch = async () => {
+    if (searchTags.length === 0) {
+      // If no search tags, reset to show all items by reloading vault data
+      loadVaultData()
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const results = await vaultService.searchByTags(vaultId, searchTags)
+      setVault({
+        ...vault,
+        items: results,
+      })
+    } catch (error) {
+      console.error("Error searching by tags:", error)
+      toast({
+        title: "Error",
+        description: "Failed to search by tags",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Add tag to search
+  const addSearchTag = (tag) => {
+    if (tag && !searchTags.includes(tag)) {
+      setSearchTags([...searchTags, tag])
+    }
+  }
+
+  // Remove tag from search
+  const removeSearchTag = (tag) => {
+    setSearchTags(searchTags.filter((t) => t !== tag))
+  }
+
+  // Effect to trigger search when search tags change
+  useEffect(() => {
+    handleTagSearch()
+  }, [searchTags])
+
   // Render sidebar item
   const renderSidebarItem = (item) => {
     const isFolder = item.element_type === "FOLDER"
@@ -789,13 +859,7 @@ export default function VaultPage() {
 
               <button
                 className="flex items-center flex-1 overflow-hidden"
-                onClick={() => {
-                  if (isFolder) {
-                    toggleFolder(item.id_element)
-                  } else {
-                    setActiveItem(item)
-                  }
-                }}
+                onClick={() => handleItemSelection(item)}
               >
                 {isFolder ? (
                   <Folder className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -973,7 +1037,7 @@ export default function VaultPage() {
                           className={`flex items-center py-1 px-2 rounded-md text-sm ${
                             activeItem && activeItem.id_element === item.id_element ? "bg-primary/10 text-primary" : "hover:bg-muted"
                           }`}
-                          onClick={() => item.element_type === "FILE" && setActiveItem(item)}
+                          onClick={() => handleItemSelection(item)}
                         >
                           {item.element_type === "FOLDER" ? (
                             <Folder className="h-4 w-4 mr-2 flex-shrink-0" />
