@@ -47,6 +47,7 @@ export default function HeroSection() {
       <section className="py-12 md:py-20 px-4 bg-[#0e0a1a] dark:bg-[#0e0a1a] relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a1333]/50 via-transparent to-[#7b4fff]/20 pointer-events-none" />
         <div className="max-w-5xl mx-auto text-center relative z-10">
+      
           <motion.h1
             className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white"
             initial={{ opacity: 0, y: 20 }}
@@ -110,7 +111,6 @@ export default function HeroSection() {
           </div>
         </div>
       </section>
-
       <NewsletterSection />
       <Footer />
     </>
