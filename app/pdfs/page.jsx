@@ -262,7 +262,6 @@ export default function PDFsPage() {
       })
     }
   }
-
   const handleViewPdf = (pdf) => {
     setSelectedPdf(pdf)
     setShowPdfViewer(true)
@@ -270,25 +269,19 @@ export default function PDFsPage() {
 
   const handleDownloadPdf = async (pdfId) => {
     try {
-      const response = await fetch(`/api/pdfs/${pdfId}/download`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to download PDF')
-      }
-
-      const blob = await response.blob()
+      const blob = await pdfService.downloadPdf(pdfId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `document-${pdfId}.pdf`
+      const pdf = pdfs.find(p => p.id === pdfId)
+      a.download = pdf?.title ? `${pdf.title}.pdf` : `document-${pdfId}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+      toast({
+        description: "PDF downloaded successfully"
+      })
     } catch (error) {
       console.error('Error downloading PDF:', error)
       toast({
@@ -630,9 +623,7 @@ export default function PDFsPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-
-      <PdfViewer
+      </Dialog>      <PdfViewer
         isOpen={showPdfViewer}
         onClose={() => {
           setShowPdfViewer(false)
@@ -640,6 +631,8 @@ export default function PDFsPage() {
         }}
         pdfId={selectedPdf?.id}
         pdfTitle={selectedPdf?.title}
+        onDelete={handleDeletePdf}
+        onEdit={(pdfId) => handleModifyPdf(pdfId)}
       />
     </div>
   )

@@ -8,10 +8,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, Download } from "lucide-react"
+import { X, Download, Edit, Trash2, MoreVertical } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { pdfService } from '@/lib/pdf-service'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
-export default function PdfViewer({ isOpen, onClose, pdfId, pdfTitle }) {
+export default function PdfViewer({ isOpen, onClose, pdfId, pdfTitle, onDelete, onEdit }) {
   const [pdfUrl, setPdfUrl] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -20,15 +27,7 @@ export default function PdfViewer({ isOpen, onClose, pdfId, pdfTitle }) {
       const loadPdf = async () => {
         try {
           setLoading(true)
-          const response = await fetch(`/api/pdfs/${pdfId}/view`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`
-            }
-          })
-          if (!response.ok) {
-            throw new Error('Failed to load PDF')
-          }
-          const blob = await response.blob()
+          const blob = await pdfService.viewPdf(pdfId)
           const url = URL.createObjectURL(blob)
           setPdfUrl(url)
         } catch (error) {
@@ -53,17 +52,7 @@ export default function PdfViewer({ isOpen, onClose, pdfId, pdfTitle }) {
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(`/api/pdfs/${pdfId}/download`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to download PDF')
-      }
-      
-      const blob = await response.blob()
+      const blob = await pdfService.downloadPdf(pdfId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -91,7 +80,7 @@ export default function PdfViewer({ isOpen, onClose, pdfId, pdfTitle }) {
       <DialogContent className="max-w-[90vw] w-full h-[90vh] flex flex-col">
         <DialogHeader className="flex flex-row justify-between items-center">
           <DialogTitle className="text-xl font-semibold">{pdfTitle}</DialogTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button
               variant="outline"
               size="icon"
@@ -101,6 +90,31 @@ export default function PdfViewer({ isOpen, onClose, pdfId, pdfTitle }) {
             >
               <Download className="h-4 w-4" />
             </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:bg-muted">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit?.(pdfId)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    onDelete?.(pdfId)
+                    onClose()
+                  }}
+                  className="text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               variant="ghost"
               size="icon"
