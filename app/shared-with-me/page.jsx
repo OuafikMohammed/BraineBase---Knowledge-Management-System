@@ -7,95 +7,64 @@ import Footer from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Folder, FileText, Search, Users, Eye, Edit } from "lucide-react"
+import { Folder, FileText, Search, Users } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
+import { collectionService } from "@/lib/collection-service"
 
 export default function SharedWithMePage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
-  const [theme, setTheme] = useState("light")
   const [searchQuery, setSearchQuery] = useState("")
   const [sharedCollections, setSharedCollections] = useState([])
   const [filteredCollections, setFilteredCollections] = useState([])
 
-  // Mock shared collections
-  const mockSharedCollections = [
-    {
-      id: 5,
-      name: "Project X Research",
-      description: "Research materials for Project X",
-      count: 8,
-      owner: { id: 2, name: "Jane Smith", avatar: "/placeholder.svg?height=40&width=40", role: "EDITOR" },
-      lastUpdated: "2023-12-01",
-      permission: "READ",
-    },
-    {
-      id: 6,
-      name: "Marketing Assets",
-      description: "Brand assets and marketing materials",
-      count: 12,
-      owner: { id: 3, name: "Robert Johnson", avatar: "/placeholder.svg?height=40&width=40", role: "EDITOR" },
-      lastUpdated: "2023-11-15",
-      permission: "EDIT",
-    },
-    {
-      id: 7,
-      name: "Client Presentations",
-      description: "Presentations for client meetings",
-      count: 5,
-      owner: { id: 4, name: "Emily Davis", avatar: "/placeholder.svg?height=40&width=40", role: "EDITOR" },
-      lastUpdated: "2023-10-20",
-      permission: "READ",
-    },
-    {
-      id: 8,
-      name: "Development Guidelines",
-      description: "Best practices and guidelines for development",
-      count: 9,
-      owner: { id: 5, name: "Michael Wilson", avatar: "/placeholder.svg?height=40&width=40", role: "ADMIN" },
-      lastUpdated: "2023-09-25",
-      permission: "EDIT",
-    },
-  ]
-
-  // Check for saved theme preference and user data
+  // Check authentication state and fetch shared collections
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
-    }
-
-    // Check if user is logged in (mock implementation)
-    const mockUser = {
-      id: 1,
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "Editor",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    }
-
-    // In a real app, you would check if the user is logged in
-    const isUserLoggedIn = true // Mock value
-
-    if (isUserLoggedIn) {
-      setUser(mockUser)
+    const token = localStorage.getItem("token")
+    const userId = localStorage.getItem("userId")
+    const userName = localStorage.getItem("userName")
+    const userEmail = localStorage.getItem("userEmail")
+    const userRole = localStorage.getItem("userRole")
+    
+    if (token && userId) {
       setIsLoggedIn(true)
-      setSharedCollections(mockSharedCollections)
-      setFilteredCollections(mockSharedCollections)
+      setUser({
+        id: parseInt(userId),
+        name: userName,
+        email: userEmail,
+        status: userRole || "Viewer",
+        profileType: "Standard",
+        profileImage: "/placeholder.svg?height=40&width=40"
+      })
+      
+      fetchSharedCollections()
+    } else {
+      router.push("/login")
     }
-  }, [])
+  }, [router])
 
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
+  // Fetch shared collections
+  const fetchSharedCollections = async () => {
+    try {
+      setIsLoading(true)
+      const collections = await collectionService.getSharedCollections()
+      setSharedCollections(collections)
+      setFilteredCollections(collections)
+    } catch (error) {
+      console.error("Error fetching shared collections:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load shared collections",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Handle search
@@ -106,7 +75,7 @@ export default function SharedWithMePage() {
         (collection) =>
           collection.name.toLowerCase().includes(query.toLowerCase()) ||
           collection.description.toLowerCase().includes(query.toLowerCase()) ||
-          collection.owner.name.toLowerCase().includes(query.toLowerCase()),
+          collection.creator.name.toLowerCase().includes(query.toLowerCase())
       )
       setFilteredCollections(filtered)
     } else {
@@ -125,20 +94,25 @@ export default function SharedWithMePage() {
     return new Date(dateString).toLocaleDateString(undefined, options)
   }
 
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
         isLoggedIn={isLoggedIn}
         user={user}
-        onLoginClick={() => {}}
-        onSignupClick={() => {}}
         onLogout={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          router.push("/");
+          localStorage.removeItem("token")
+          localStorage.removeItem("userId")
+          localStorage.removeItem("userName")
+          localStorage.removeItem("userEmail")
+          localStorage.removeItem("userRole")
+          setIsLoggedIn(false)
+          setUser(null)
+          router.push("/")
         }}
-        theme={theme}
-        toggleTheme={toggleTheme}
       />
 
       <div className="flex-grow container mx-auto py-10 px-4">
@@ -172,19 +146,6 @@ export default function SharedWithMePage() {
                       <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
                       <span>{collection.name}</span>
                     </CardTitle>
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      {collection.permission === "READ" ? (
-                        <>
-                          <Eye className="h-3 w-3 text-blue-500" />
-                          <span>Read Only</span>
-                        </>
-                      ) : (
-                        <>
-                          <Edit className="h-3 w-3 text-green-500" />
-                          <span>Can Edit</span>
-                        </>
-                      )}
-                    </Badge>
                   </div>
                   <CardDescription>{collection.description}</CardDescription>
                 </CardHeader>
@@ -194,16 +155,19 @@ export default function SharedWithMePage() {
                       <FileText className="h-4 w-4 mr-2" />
                       <span>{collection.count} documents</span>
                     </div>
-                    <span>Updated: {formatDate(collection.lastUpdated)}</span>
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Users className="h-4 w-4 text-blue-500" />
+                      <span>Shared</span>
+                    </Badge>
                   </div>
                   <div className="mt-3 flex items-center">
                     <p className="text-xs text-muted-foreground mr-2">Shared by:</p>
                     <div className="flex items-center">
                       <Avatar className="h-6 w-6 mr-2">
-                        <AvatarImage src={collection.owner.avatar} alt={collection.owner.name} />
-                        <AvatarFallback>{collection.owner.name.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={collection.creator.avatar} alt={collection.creator.name} />
+                        <AvatarFallback>{collection.creator.name.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      <span className="text-sm">{collection.owner.name}</span>
+                      <span className="text-sm">{collection.creator.name}</span>
                     </div>
                   </div>
                 </CardContent>

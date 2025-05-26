@@ -104,9 +104,10 @@ export default function PDFsPage() {
     (pdf) =>
       (activeCategory === "all" || pdf.category === activeCategory || 
        (activeCategory === "Uncategorized" && !pdf.category)) &&
-      (pdf.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pdf.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
        pdf.description?.toLowerCase().includes(searchQuery.toLowerCase()))
   )
+
 
   // Fetch PDFs and collections on component mount
   useEffect(() => {
@@ -115,7 +116,7 @@ export default function PDFsPage() {
         setIsLoading(true)
         const token = localStorage.getItem("token")
         if (!token) {
-          router.push("/login")
+          router.push("/")
           return
         }
 
@@ -299,6 +300,20 @@ export default function PDFsPage() {
   const [uploadCategory, setUploadCategory] = useState('')
   const [isUploading, setIsUploading] = useState(false)
 
+  const handleAddToCollection = async (pdfId, collectionId) => {
+    try {
+      await collectionService.addPdfToCollection(collectionId, pdfId);
+      toast({ description: "PDF added to collection successfully" });
+    } catch (error) {
+      console.error("Error adding PDF to collection:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add PDF to collection",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
@@ -448,6 +463,53 @@ export default function PDFsPage() {
                                 Download
                               </Button>
                             </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {collections.length > 0 && (
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                      <Folder className="h-4 w-4 mr-2" />
+                                      Add to Collection
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                      <DropdownMenuSubContent>
+                                        {collections.map((collection) => (
+                                          <DropdownMenuItem
+                                            key={collection.id}
+                                            onClick={() => handleAddToCollection(pdf.id, collection.id)}
+                                          >
+                                            <Bookmark className="h-4 w-4 mr-2" />
+                                            {collection.name}
+                                          </DropdownMenuItem>
+                                        ))}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleCreateCollection(pdf.id)}>
+                                          <Plus className="h-4 w-4 mr-2" />
+                                          Create New Collection
+                                        </DropdownMenuItem>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                  </DropdownMenuSub>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeletePdf(pdf.id)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </CardContent>
                       </Card>
@@ -502,6 +564,53 @@ export default function PDFsPage() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {collections.length > 0 && (
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <Folder className="h-4 w-4 mr-2" />
+                                    Add to Collection
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuPortal>
+                                    <DropdownMenuSubContent>
+                                      {collections.map((collection) => (
+                                        <DropdownMenuItem
+                                          key={collection.id}
+                                          onClick={() => handleAddToCollection(pdf.id, collection.id)}
+                                        >
+                                          <Bookmark className="h-4 w-4 mr-2" />
+                                          {collection.name}
+                                        </DropdownMenuItem>
+                                      ))}
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => handleCreateCollection(pdf.id)}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Create New Collection
+                                      </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeletePdf(pdf.id)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     ))

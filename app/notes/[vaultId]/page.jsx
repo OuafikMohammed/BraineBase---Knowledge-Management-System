@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
@@ -22,6 +21,7 @@ import {
   FilePlus,
   Check,
   History,
+  Loader2,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -53,10 +53,11 @@ import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import TiptapEditor from "@/components/tiptap/tiptap-editor"
 import AIResumeDialog from "@/components/tiptap/ai-resume-dialog"
-
-// Import and use the UserRole context
 import { useUserRole } from "@/components/user-role-context"
 import { vaultService } from "@/lib/vault-service"
+import { generateResumeSummary } from "@/lib/azure-ai-client"
+
+const GITHUB_TOKEN = "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" // Provided by user
 
 export default function VaultPage() {
   const params = useParams()
@@ -91,8 +92,7 @@ export default function VaultPage() {
   const [dragOverItem, setDragOverItem] = useState(null)
   const [searchTags, setSearchTags] = useState([])
   const [isSearching, setIsSearching] = useState(false)
-
-  // Add this near the top of the component
+  const [isGenerating, setIsGenerating] = useState(false)
   const { role, isAdmin, isEditor } = useUserRole()
 
   // Cache invalidation timer
@@ -100,171 +100,8 @@ export default function VaultPage() {
     const cacheInvalidationInterval = setInterval(() => {
       vaultCache.current.clear()
     }, 5 * 60 * 1000) // Clear cache every 5 minutes
-
     return () => clearInterval(cacheInvalidationInterval)
   }, [])
-
-  // Check authentication and theme on mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
-    const savedTheme = localStorage.getItem('theme');
-
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-    }
-
-    if (!token || !userId) {
-      router.push('/');
-      return;
-    }
-
-    setIsLoggedIn(true);
-    setUser({ 
-      id: userId,
-      name: localStorage.getItem('userName'),
-      email: localStorage.getItem('userEmail'),
-      profileImage: localStorage.getItem('userProfileImage')
-    });
-  }, [router]);
-
-  // Optimized loadVaultData function
-  const loadVaultData = useCallback(async () => {
-    if (!vaultId || vaultId === 'undefined') {
-      console.error('Invalid vault ID:', vaultId)
-      toast({
-        title: "Error",
-        description: "Invalid vault ID. Redirecting to notes page.",
-        variant: "destructive",
-      })
-      router.push('/notes')
-      return
-    }
-
-    // Check cache first
-    if (vaultCache.current.has(vaultId)) {
-      const cachedData = vaultCache.current.get(vaultId)
-      const cacheAge = Date.now() - cachedData.timestamp
-      if (cacheAge < 5 * 60 * 1000) { // Cache valid for 5 minutes
-        console.log('Loading vault from cache')
-        setVault(cachedData.data)
-        return
-      }
-    }
-
-    setLoadingVault(true)
-    try {
-      console.log('Loading vault with ID:', vaultId)
-      const vaultData = await vaultService.getVault(vaultId)
-      console.log('Loaded vault data:', vaultData)
-
-      if (!vaultData) {
-        console.error('No vault data returned')
-        toast({
-          title: "Error",
-          description: "The vault you're looking for doesn't exist or you don't have access to it.",
-          variant: "destructive",
-        })
-        router.push('/notes')
-        return
-      }
-
-      // Ensure items array exists and normalize data
-      const normalizedData = {
-        ...vaultData,
-        items: vaultData.items || [],
-      }
-
-      // Update cache
-      vaultCache.current.set(vaultId, {
-        data: normalizedData,
-        timestamp: Date.now()
-      })
-
-      setVault(normalizedData)
-
-      // Set first file as active if no active item
-      if (!activeItem) {
-        const firstFile = normalizedData.items.find((item) => item.element_type === "FILE")
-        if (firstFile) {
-          setActiveItem(firstFile)
-          setTags(firstFile.tags || [])
-          setNoteVersions(firstFile.versions || [])
-        }
-      }
-
-      // Expand all parent folders of the active item in a single pass
-      if (activeItem?.id_parent) {
-        const newExpandedFolders = {}
-        let currentParentId = activeItem.id_parent
-
-        while (currentParentId) {
-          newExpandedFolders[currentParentId] = true
-          const parentFolder = normalizedData.items.find((item) => item.id_element === currentParentId)
-          currentParentId = parentFolder ? parentFolder.id_parent : null
-        }
-
-        setExpandedFolders(prev => ({...prev, ...newExpandedFolders}))
-      }
-    } catch (error) {
-      console.error("Error loading vault data:", error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load vault data",
-        variant: "destructive",
-      })
-      router.push('/notes')
-    } finally {
-      setLoadingVault(false)
-    }
-  }, [vaultId, router, activeItem])
-
-  // Update the useEffect
-  useEffect(() => {
-    loadVaultData()
-  }, [loadVaultData])
-
-  // Update versions and tags when active item changes
-  useEffect(() => {
-    if (activeItem) {
-      if (activeItem.versions) {
-        setNoteVersions(activeItem.versions)
-      } else {
-        setNoteVersions([])
-      }
-
-      if (activeItem.tags) {
-        setTags(activeItem.tags)
-      } else {
-        setTags([])
-      }
-    }
-  }, [activeItem])
-
-  // Auto-save functionality
-  const [contentChanged, setContentChanged] = useState(false)
-  const autoSaveIntervalRef = useRef(null)
-
-  useEffect(() => {
-    if (contentChanged && activeItem) {
-      // Clear any existing timer
-      if (autoSaveIntervalRef.current) {
-        clearTimeout(autoSaveIntervalRef.current)
-      }
-
-      // Set a new timer
-      autoSaveIntervalRef.current = setTimeout(() => {
-        handleSaveContent(true)
-      }, 5000) // Auto-save after 5 seconds of inactivity
-    }
-
-    return () => {
-      if (autoSaveIntervalRef.current) {
-        clearTimeout(autoSaveIntervalRef.current)
-      }
-    }
-  }, [contentChanged])
 
   // Theme toggle function
   const toggleTheme = () => {
@@ -272,268 +109,6 @@ export default function VaultPage() {
     setTheme(newTheme)
     localStorage.setItem("theme", newTheme)
     document.documentElement.classList.toggle("dark", newTheme === "dark")
-  }
-
-  // Toggle folder expansion
-  const toggleFolder = (folderId) => {
-    setExpandedFolders((prev) => ({
-      ...prev,
-      [folderId]: !prev[folderId],
-    }))
-  }
-
-  // Get root level items
-  const getRootItems = () => {
-    if (!vault || !vault.items) return [];
-    return vault.items.filter((item) => item.id_parent === null);
-  }
-
-  // Get children of a folder
-  const getChildItems = (folderId) => {
-    if (!vault) return []
-    return vault.items.filter((item) => item.id_parent === folderId)
-  }
-
-  // Handle file/folder selection
-  const handleItemSelection = (item) => {
-    if (item.element_type === "FOLDER") {
-      toggleFolder(item.id_element);
-    } else {
-      // If we have unsaved changes in the current file, save them first
-      if (contentChanged && activeItem) {
-        handleSaveContent(true);
-      }
-      
-      // Set the new active item
-      setActiveItem(item);
-      
-      // Reset content change tracking
-      setContentChanged(false);
-      
-      // If we have an editor reference, update its content
-      if (editorRef.current) {
-        editorRef.current.setContent(item.content_html || "");
-      }
-      
-      // Update tags and versions
-      setTags(item.tags || []);
-      setNoteVersions(item.versions || []);
-    }
-  }
-
-  // Open create dialog for a specific parent folder
-  const openCreateDialog = (type, parentId = null) => {
-    setCreateType(type)
-    setParentFolderId(parentId)
-    setNewItemName("")
-    setIsCreateDialogOpen(true)
-  }
-
-  // Create new item (file or folder)
-  const handleCreateItem = async () => {
-    if (!newItemName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const newElement = await vaultService.createElement(vaultId, {
-        name: newItemName.trim(),
-        element_type: createType === "file" ? "FILE" : "FOLDER",
-        content_html: createType === "file" ? "" : undefined,
-        id_parent: parentFolderId,
-      });
-
-      setVault({
-        ...vault,
-        items: [...vault.items, newElement],
-      });
-
-      setNewItemName("");
-      setIsCreateDialogOpen(false);
-
-      if (createType === "folder") {
-        setExpandedFolders((prev) => ({
-          ...prev,
-          [newElement.id_element]: true,
-        }));
-      } else {
-        setActiveItem(newElement);
-        setTags([]);
-        setNoteVersions([]);
-      }
-
-      toast({
-        title: `${createType === "file" ? "Note" : "Folder"} created`,
-        description: `${newItemName} has been created successfully.`,
-      });
-    } catch (error) {
-      console.error("Error creating item:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create item",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Update the handleSaveContent function
-  const handleSaveContent = async (isAutoSave = false) => {
-    if (!activeItem || activeItem.element_type !== "FILE" || !editorRef.current) return;
-
-    setIsSaving(true);
-    const content = editorRef.current.getContent();
-
-    try {
-      // Save the content
-      await vaultService.updateElementContent(activeItem.id_element, content);
-
-      // Create a new version
-      const newVersion = {
-        id: noteVersions.length > 0 ? Math.max(...noteVersions.map((v) => v.id)) + 1 : 1,
-        date: new Date().toISOString(),
-        content: activeItem.content_html,
-      };
-
-      const updatedItems = vault.items.map((item) => {
-        if (item.id_element === activeItem.id_element) {
-          return {
-            ...item,
-            content_html: content,
-            last_edited: new Date().toISOString(),
-            versions: [...(item.versions || []), newVersion],
-          };
-        }
-        return item;
-      });
-
-      setVault({
-        ...vault,
-        items: updatedItems,
-      });
-
-      // Update the active item
-      const updatedActiveItem = updatedItems.find((item) => item.id_element === activeItem.id_element);
-      setActiveItem(updatedActiveItem);
-
-      if (updatedActiveItem.versions) {
-        setNoteVersions(updatedActiveItem.versions);
-      }
-
-      setIsSaving(false);
-      setContentChanged(false);
-      setLastSaved(new Date());
-
-      if (!isAutoSave) {
-        setShowSaveSuccess(true);
-        setTimeout(() => setShowSaveSuccess(false), 3000);
-
-        toast({
-          title: "Note saved",
-          description: "Your note has been saved successfully.",
-          variant: "success",
-        });
-      }
-    } catch (error) {
-      console.error("Error saving content:", error);
-      setIsSaving(false);
-      
-      toast({
-        title: "Error",
-        description: "Failed to save content",
-        variant: "destructive",
-      });
-    }
-  };
-
-  
-  // Delete item
-  const handleDeleteItem = async (itemId) => {
-    const itemToDelete = vault.items.find((item) => item.id_element === itemId);
-    if (!itemToDelete) return;
-
-    if (!window.confirm(`Are you sure you want to delete "${itemToDelete.name}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await vaultService.deleteElement(itemId);
-
-      // Get all descendant items if it's a folder
-      let itemsToDelete = [itemId];
-      if (itemToDelete.element_type === "FOLDER") {
-        const getDescendants = (parentId) => {
-          const children = vault.items.filter((item) => item.id_parent === parentId);
-          let descendants = [...children.map((child) => child.id_element)];
-
-          children.forEach((child) => {
-            if (child.element_type === "FOLDER") {
-              descendants = [...descendants, ...getDescendants(child.id_element)];
-            }
-          });
-
-          return descendants;
-        };
-
-        itemsToDelete = [...itemsToDelete, ...getDescendants(itemId)];
-      }
-
-      const updatedItems = vault.items.filter((item) => !itemsToDelete.includes(item.id_element));
-
-      setVault({
-        ...vault,
-        items: updatedItems,
-      });
-
-      // Clear active item if it was deleted
-      if (activeItem && itemsToDelete.includes(activeItem.id_element)) {
-        setActiveItem(null);
-        setTags([]);
-        setNoteVersions([]);
-      }
-
-      toast({
-        title: `${itemToDelete.element_type === "FILE" ? "Note" : "Folder"} deleted`,
-        description: `"${itemToDelete.name}" has been deleted.`,
-      });
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete item",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Handle content change in the editor
-  const handleContentChange = (content) => {
-    setContentChanged(true)
-  }
-
-  // Format date for last saved timestamp
-  const formatLastSaved = (date) => {
-    if (!date) return ""
-
-    const now = new Date()
-    const diff = Math.floor((now - date) / 1000) // difference in seconds
-
-    if (diff < 60) return "Just now"
-    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`
-    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`
-
-    return date.toLocaleDateString()
-  }
-
-  // Format ISO date to readable format
-  const formatDate = (isoDate) => {
-    if (!isoDate) return ""
-    const date = new Date(isoDate)
-    return date.toLocaleString()
   }
 
   // Handle AI resume request
@@ -550,282 +125,400 @@ export default function VaultPage() {
     setIsAIResumeDialogOpen(false)
   }
 
-  // Restore a previous version
-  const restoreVersion = async (version) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to restore this version? Your current changes will be saved as a new version.",
-      )
-    ) {
+  // Generate AI Summary using Azure ModelClient
+  const generateAISummary = async () => {
+    if (!selectedText) return
+    setIsGenerating(true)
+    try {
+      const summary = await generateResumeSummary({
+        token: GITHUB_TOKEN,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that generates concise, professional resume bullet points from selected text.'
+          },
+          {
+            role: 'user',
+            content: selectedText
+          }
+        ],
+        temperature: 0.7,
+        top_p: 0.7
+      })
+      applyAISummary(summary)
+      toast({
+        title: "Summary Generated",
+        description: "Your AI-generated resume bullet point is ready.",
+        variant: "success"
+      })
+    } catch (error) {
+      console.error("Error generating AI summary:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate summary using AI.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // Load vault data
+  const loadVaultData = useCallback(async () => {
+    if (!vaultId || vaultId === 'undefined') {
+      console.error('Invalid vault ID:', vaultId)
+      toast({
+        title: "Error",
+        description: "Invalid vault ID. Redirecting to notes page.",
+        variant: "destructive",
+      })
+      router.push('/notes')
       return
     }
 
-    try {
-      // Call API to restore version
-      const updatedElement = await vaultService.restoreVersion(
-        activeItem.id_element,
-        version.id
-      )
+    if (vaultCache.current.has(vaultId)) {
+      const cachedData = vaultCache.current.get(vaultId)
+      const cacheAge = Date.now() - cachedData.timestamp
+      if (cacheAge < 5 * 60 * 1000) {
+        setVault(cachedData.data)
+        return
+      }
+    }
 
-      // Update the editor with the restored content
-      if (editorRef.current) {
-        editorRef.current.setContent(version.content)
+    setLoadingVault(true)
+    try {
+      const vaultData = await vaultService.getVault(vaultId)
+      if (!vaultData) {
+        toast({
+          title: "Error",
+          description: "Vault not found.",
+          variant: "destructive",
+        })
+        router.push('/notes')
+        return
       }
 
-      // Update the vault items
+      const normalizedData = {
+        ...vaultData,
+        items: vaultData.items || [],
+      }
+
+      vaultCache.current.set(vaultId, {
+        data: normalizedData,
+        timestamp: Date.now()
+      })
+
+      setVault(normalizedData)
+
+      if (!activeItem && normalizedData.items.length > 0) {
+        const firstFile = normalizedData.items.find((item) => item.element_type === "FILE")
+        if (firstFile) {
+          setActiveItem(firstFile)
+          setTags(firstFile.tags || [])
+          setNoteVersions(firstFile.versions || [])
+        }
+      }
+
+    } catch (error) {
+      console.error("Error loading vault data:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load vault data",
+        variant: "destructive",
+      })
+      router.push('/notes')
+    } finally {
+      setLoadingVault(false)
+    }
+  }, [vaultId, router, activeItem])
+
+  useEffect(() => {
+    loadVaultData()
+  }, [loadVaultData])
+
+  useEffect(() => {
+    if (activeItem) {
+      setTags(activeItem.tags || [])
+      setNoteVersions(activeItem.versions || [])
+    }
+  }, [activeItem])
+
+  // Auto-save functionality
+  const [contentChanged, setContentChanged] = useState(false)
+  const autoSaveIntervalRef = useRef(null)
+
+  useEffect(() => {
+    if (contentChanged && activeItem) {
+      if (autoSaveIntervalRef.current) {
+        clearTimeout(autoSaveIntervalRef.current)
+      }
+      autoSaveIntervalRef.current = setTimeout(() => {
+        handleSaveContent(true)
+      }, 5000)
+    }
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearTimeout(autoSaveIntervalRef.current)
+      }
+    }
+  }, [contentChanged])
+
+  // Handle content change in the editor
+  const handleContentChange = (content) => {
+    setContentChanged(true)
+  }
+
+  // Save content
+  const handleSaveContent = async (isAutoSave = false) => {
+    if (!activeItem || activeItem.element_type !== "FILE" || !editorRef.current) return
+    setIsSaving(true)
+    const content = editorRef.current.getContent()
+    try {
+      await vaultService.updateElementContent(activeItem.id_element, content)
+      const newVersion = {
+        id: noteVersions.length > 0 ? Math.max(...noteVersions.map((v) => v.id)) + 1 : 1,
+        date: new Date().toISOString(),
+        content: activeItem.content_html,
+      }
       const updatedItems = vault.items.map((item) => {
         if (item.id_element === activeItem.id_element) {
-          return updatedElement
+          return {
+            ...item,
+            content_html: content,
+            last_edited: new Date().toISOString(),
+            versions: [...(item.versions || []), newVersion],
+          }
         }
         return item
       })
-
-      setVault({
-        ...vault,
-        items: updatedItems,
-      })
-
-      // Update the active item
-      setActiveItem(updatedElement)
-      setNoteVersions(updatedElement.versions || [])
-
-      toast({
-        title: "Version restored",
-        description: `Version from ${formatDate(version.date)} has been restored.`,
-      })
+      setVault({ ...vault, items: updatedItems })
+      const updatedActiveItem = updatedItems.find((item) => item.id_element === activeItem.id_element)
+      setActiveItem(updatedActiveItem)
+      setIsSaving(false)
+      setContentChanged(false)
+      setLastSaved(new Date())
+      if (!isAutoSave) {
+        setShowSaveSuccess(true)
+        setTimeout(() => setShowSaveSuccess(false), 3000)
+        toast({
+          title: "Note saved",
+          description: "Your note has been saved successfully.",
+          variant: "success",
+        })
+      }
     } catch (error) {
-      console.error("Error restoring version:", error)
+      console.error("Error saving content:", error)
+      setIsSaving(false)
       toast({
         title: "Error",
-        description: "Failed to restore version",
+        description: "Failed to save content",
         variant: "destructive",
       })
     }
   }
 
-  // Add a new tag
+  // Toggle folder expansion
+  const toggleFolder = (folderId) => {
+    setExpandedFolders((prev) => ({
+      ...prev,
+      [folderId]: !prev[folderId],
+    }))
+  }
+
+  // Get root level items
+  const getRootItems = () => {
+    if (!vault || !vault.items) return []
+    return vault.items.filter((item) => item.id_parent === null)
+  }
+
+  // Get children of a folder
+  const getChildItems = (folderId) => {
+    if (!vault) return []
+    return vault.items.filter((item) => item.id_parent === folderId)
+  }
+
+  // Handle file/folder selection
+  const handleItemSelection = (item) => {
+    if (item.element_type === "FOLDER") {
+      toggleFolder(item.id_element)
+    } else {
+      if (contentChanged && activeItem) {
+        handleSaveContent(true)
+      }
+      setActiveItem(item)
+      setContentChanged(false)
+      if (editorRef.current) {
+        editorRef.current.setContent(item.content_html || "")
+      }
+      setTags(item.tags || [])
+      setNoteVersions(item.versions || [])
+    }
+  }
+
+  // Create new item (file or folder)
+  const handleCreateItem = async () => {
+    if (!newItemName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a name",
+        variant: "destructive",
+      })
+      return
+    }
+    try {
+      const newElement = await vaultService.createElement(vaultId, {
+        name: newItemName.trim(),
+        element_type: createType === "file" ? "FILE" : "FOLDER",
+        content_html: createType === "file" ? "" : undefined,
+        id_parent: parentFolderId,
+      })
+      setVault({
+        ...vault,
+        items: [...vault.items, newElement],
+      })
+      setNewItemName("")
+      setIsCreateDialogOpen(false)
+      if (createType === "folder") {
+        setExpandedFolders((prev) => ({
+          ...prev,
+          [newElement.id_element]: true,
+        }))
+      } else {
+        setActiveItem(newElement)
+        setTags([])
+        setNoteVersions([])
+      }
+      toast({
+        title: `${createType === "file" ? "Note" : "Folder"} created`,
+        description: `${newItemName} has been created successfully.`,
+      })
+    } catch (error) {
+      console.error("Error creating item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create item",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Delete item
+  const handleDeleteItem = async (itemId) => {
+    const itemToDelete = vault.items.find((item) => item.id_element === itemId)
+    if (!itemToDelete) return
+    if (!window.confirm(`Are you sure you want to delete "${itemToDelete.name}"? This action cannot be undone.`)) {
+      return
+    }
+    try {
+      await vaultService.deleteElement(itemId)
+      let itemsToDelete = [itemId]
+      if (itemToDelete.element_type === "FOLDER") {
+        const getDescendants = (parentId) => {
+          const children = vault.items.filter((item) => item.id_parent === parentId)
+          let descendants = [...children.map((child) => child.id_element)]
+          children.forEach((child) => {
+            if (child.element_type === "FOLDER") {
+              descendants = [...descendants, ...getDescendants(child.id_element)]
+            }
+          })
+          return descendants
+        }
+        itemsToDelete = [...itemsToDelete, ...getDescendants(itemId)]
+      }
+      const updatedItems = vault.items.filter((item) => !itemsToDelete.includes(item.id_element))
+      setVault({
+        ...vault,
+        items: updatedItems,
+      })
+      if (activeItem && itemsToDelete.includes(activeItem.id_element)) {
+        setActiveItem(null)
+        setTags([])
+        setNoteVersions([])
+      }
+      toast({
+        title: `${itemToDelete.element_type === "FILE" ? "Note" : "Folder"} deleted`,
+        description: `"${itemToDelete.name}" has been deleted.`,
+      })
+    } catch (error) {
+      console.error("Error deleting item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete item",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Add tag
   const addTag = () => {
     if (!newTag.trim()) return
-
     if (!tags.includes(newTag.trim())) {
       const updatedTags = [...tags, newTag.trim()]
       setTags(updatedTags)
-
-      // Update the item
       const updatedItems = vault.items.map((item) => {
         if (item.id_element === activeItem.id_element) {
           return { ...item, tags: updatedTags }
         }
         return item
       })
-
       setVault({
         ...vault,
         items: updatedItems,
       })
-
-      // Update active item
       setActiveItem({
         ...activeItem,
         tags: updatedTags,
       })
-
       toast({
         title: "Tag added",
         description: `Tag "${newTag}" has been added.`,
       })
     }
-
     setNewTag("")
     setIsAddingTag(false)
   }
 
-  // Remove a tag
+  // Remove tag
   const removeTag = (tagToRemove) => {
     const updatedTags = tags.filter((tag) => tag !== tagToRemove)
     setTags(updatedTags)
-
-    // Update the item
     const updatedItems = vault.items.map((item) => {
       if (item.id_element === activeItem.id_element) {
         return { ...item, tags: updatedTags }
       }
       return item
     })
-
     setVault({
       ...vault,
       items: updatedItems,
     })
-
-    // Update active item
     setActiveItem({
       ...activeItem,
       tags: updatedTags,
     })
-
     toast({
       title: "Tag removed",
       description: `Tag "${tagToRemove}" has been removed.`,
     })
   }
 
-  // Handle drag start
-  const handleDragStart = (e, item) => {
-    setDraggedItem(item)
+  // Format date
+  const formatDate = (isoDate) => {
+    if (!isoDate) return ""
+    const date = new Date(isoDate)
+    return date.toLocaleString()
   }
 
-  // Handle drag over
-  const handleDragOver = (e, item) => {
-    e.preventDefault()
-    if (item.element_type === "FOLDER") {
-      setDragOverItem(item)
-    }
+  // Format last saved timestamp
+  const formatLastSaved = (date) => {
+    if (!date) return ""
+    const now = new Date()
+    const diff = Math.floor((now - date) / 1000)
+    if (diff < 60) return "Just now"
+    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`
+    return date.toLocaleDateString()
   }
-
-  // Handle drop
-  const handleDrop = (e, targetFolder) => {
-    e.preventDefault()
-
-    if (!draggedItem || draggedItem.id_element === targetFolder.id_element) {
-      setDraggedItem(null)
-      setDragOverItem(null)
-      return
-    }
-
-    // Don't allow dropping a folder into its own descendant
-    if (draggedItem.element_type === "FOLDER") {
-      let currentParentId = targetFolder.id_parent
-      while (currentParentId) {
-        if (currentParentId === draggedItem.id_element) {
-          toast({
-            title: "Invalid operation",
-            description: "Cannot move a folder into its own subfolder.",
-            variant: "destructive",
-          })
-          setDraggedItem(null)
-          setDragOverItem(null)
-          return
-        }
-        const parentFolder = vault.items.find((item) => item.id_element === currentParentId)
-        currentParentId = parentFolder ? parentFolder.id_parent : null
-      }
-    }
-
-    // Update the item's parent
-    const updatedItems = vault.items.map((item) => {
-      if (item.id_element === draggedItem.id_element) {
-        return { ...item, id_parent: targetFolder.id_element }
-      }
-      return item
-    })
-
-    setVault({
-      ...vault,
-      items: updatedItems,
-    })
-
-    // Expand the target folder
-    setExpandedFolders((prev) => ({
-      ...prev,
-      [targetFolder.id_element]: true,
-    }))
-
-    toast({
-      title: "Item moved",
-      description: `"${draggedItem.name}" has been moved to "${targetFolder.name}".`,
-    })
-
-    setDraggedItem(null)
-    setDragOverItem(null)
-  }
-
-  // Handle drop on root
-  const handleDropOnRoot = (e) => {
-    e.preventDefault()
-
-    if (!draggedItem || draggedItem.id_parent === null) {
-      setDraggedItem(null)
-      return
-    }
-
-    // Update the item's parent to null (root)
-    const updatedItems = vault.items.map((item) => {
-      if (item.id_element === draggedItem.id_element) {
-        return { ...item, id_parent: null }
-      }
-      return item
-    })
-
-    setVault({
-      ...vault,
-      items: updatedItems,
-    })
-
-    toast({
-      title: "Item moved",
-      description: `"${draggedItem.name}" has been moved to the root level.`,
-    })
-
-    setDraggedItem(null)
-  }
-
-  // Search functionality
-  const filteredItems = useCallback(() => {
-    if (!vault || !searchQuery.trim()) return null
-
-    return vault.items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.element_type === "FILE" &&
-          item.tags &&
-          item.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))),
-    )
-  }, [vault, searchQuery])
-
-  // Search by tags
-  const handleTagSearch = async () => {
-    if (searchTags.length === 0) {
-      // If no search tags, reset to show all items by reloading vault data
-      loadVaultData()
-      return
-    }
-
-    setIsSearching(true)
-    try {
-      const results = await vaultService.searchByTags(vaultId, searchTags)
-      setVault({
-        ...vault,
-        items: results,
-      })
-    } catch (error) {
-      console.error("Error searching by tags:", error)
-      toast({
-        title: "Error",
-        description: "Failed to search by tags",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSearching(false)
-    }
-  }
-
-  // Add tag to search
-  const addSearchTag = (tag) => {
-    if (tag && !searchTags.includes(tag)) {
-      setSearchTags([...searchTags, tag])
-    }
-  }
-
-  // Remove tag from search
-  const removeSearchTag = (tag) => {
-    setSearchTags(searchTags.filter((t) => t !== tag))
-  }
-
-  // Effect to trigger search when search tags change
-  useEffect(() => {
-    handleTagSearch()
-  }, [searchTags])
 
   // Render sidebar item
   const renderSidebarItem = (item) => {
@@ -833,7 +526,6 @@ export default function VaultPage() {
     const isExpanded = expandedFolders[item.id_element]
     const children = isFolder ? getChildItems(item.id_element) : []
     const isBeingDraggedOver = dragOverItem && dragOverItem.id_element === item.id_element
-
     return (
       <div key={item.id_element}>
         <ContextMenu>
@@ -856,7 +548,6 @@ export default function VaultPage() {
                   {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 </button>
               )}
-
               <button
                 className="flex items-center flex-1 overflow-hidden"
                 onClick={() => handleItemSelection(item)}
@@ -867,8 +558,6 @@ export default function VaultPage() {
                   <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
                 )}
                 <span className="truncate">{item.name}</span>
-
-                {/* Show tags for files */}
                 {!isFolder && item.tags && item.tags.length > 0 && (
                   <div className="ml-2 flex-shrink-0">
                     <Badge variant="outline" className="text-xs">
@@ -878,7 +567,6 @@ export default function VaultPage() {
                   </div>
                 )}
               </button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="p-1 opacity-0 group-hover:opacity-100 hover:bg-muted rounded-md">
@@ -927,12 +615,42 @@ export default function VaultPage() {
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
-
         {isFolder && isExpanded && children.length > 0 && (
           <div className="pl-4 border-l ml-3 mt-1">{children.map((child) => renderSidebarItem(child))}</div>
         )}
       </div>
     )
+  }
+
+  // Handle drag and drop on root (move item to root)
+  const handleDropOnRoot = (e) => {
+    e.preventDefault()
+    if (!draggedItem) return
+    // Only move if not already at root
+    if (draggedItem.id_parent !== null) {
+      vaultService.updateElementParent(draggedItem.id_element, null)
+        .then(() => {
+          const updatedItems = vault.items.map((item) =>
+            item.id_element === draggedItem.id_element
+              ? { ...item, id_parent: null }
+              : item
+          )
+          setVault({ ...vault, items: updatedItems })
+          setDraggedItem(null)
+          setDragOverItem(null)
+          toast({
+            title: "Moved to root",
+            description: `\"${draggedItem.name}\" moved to root folder.`,
+          })
+        })
+        .catch((error) => {
+          toast({
+            title: "Error",
+            description: "Failed to move item to root.",
+            variant: "destructive",
+          })
+        })
+    }
   }
 
   if (!vault) {
@@ -944,14 +662,13 @@ export default function VaultPage() {
           onLoginClick={() => {}}
           onSignupClick={() => {}}
           onLogout={() => {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            router.push("/");
+            localStorage.removeItem("token")
+            localStorage.removeItem("user")
+            router.push("/")
           }}
           theme={theme}
           toggleTheme={toggleTheme}
         />
-
         <div className="flex-grow flex items-center justify-center">
           <div className="text-center p-8">
             <div className="inline-block p-4 rounded-full bg-muted mb-4">
@@ -981,7 +698,6 @@ export default function VaultPage() {
         theme={theme}
         toggleTheme={toggleTheme}
       />
-
       <div className="flex-grow flex flex-col">
         {/* Vault header */}
         <div className="border-b p-4">
@@ -995,8 +711,7 @@ export default function VaultPage() {
               </Button>
               <h1 className="text-xl font-bold">{vault.name}</h1>
             </div>
-
-            {/* Create buttons always visible for all roles */}
+            {/* Create buttons */}
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm" onClick={() => openCreateDialog("folder", null)}>
                 <FolderPlus className="h-4 w-4 mr-2" />
@@ -1009,7 +724,6 @@ export default function VaultPage() {
             </div>
           </div>
         </div>
-
         <div className="flex-grow flex flex-col md:flex-row">
           {/* Sidebar */}
           <div
@@ -1026,12 +740,16 @@ export default function VaultPage() {
                 />
               </div>
             </div>
-
             <ScrollArea className="flex-grow">
               <div className="p-2" onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnRoot}>
                 {searchQuery.trim()
-                  ? // Search results
-                    filteredItems()?.map((item) => (
+                  ? getRootItems().filter(
+                      (item) =>
+                        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (item.element_type === "FILE" &&
+                          item.tags &&
+                          item.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+                    ).map((item) => (
                       <div key={item.id_element} className="mb-1">
                         <div
                           className={`flex items-center py-1 px-2 rounded-md text-sm ${
@@ -1045,7 +763,6 @@ export default function VaultPage() {
                             <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
                           )}
                           <span className="truncate">{item.name}</span>
-
                           {item.element_type === "FILE" && item.tags && item.tags.length > 0 && (
                             <div className="ml-2 flex-shrink-0">
                               <Badge variant="outline" className="text-xs">
@@ -1057,12 +774,10 @@ export default function VaultPage() {
                         </div>
                       </div>
                     ))
-                  : // Normal folder structure
-                    getRootItems().map((item) => renderSidebarItem(item))}
+                  : getRootItems().map((item) => renderSidebarItem(item))}
               </div>
             </ScrollArea>
           </div>
-
           {/* Main content */}
           <div className="flex-grow overflow-auto">
             <div className="p-4 max-w-4xl mx-auto">
@@ -1091,7 +806,6 @@ export default function VaultPage() {
                       </TooltipProvider>
                     </div>
                   </div>
-
                   {/* Tags */}
                   <div className="flex flex-wrap items-center gap-2 mb-4">
                     <span className="text-sm text-muted-foreground">Tags:</span>
@@ -1107,7 +821,6 @@ export default function VaultPage() {
                         </button>
                       </Badge>
                     ))}
-
                     {isAddingTag ? (
                       <div className="flex items-center gap-1">
                         <Input
@@ -1129,7 +842,6 @@ export default function VaultPage() {
                       </Button>
                     )}
                   </div>
-
                   {/* Tabs for content and history */}
                   <Tabs defaultValue="content">
                     <TabsList className="mb-4">
@@ -1142,7 +854,6 @@ export default function VaultPage() {
                         </Badge>
                       </TabsTrigger>
                     </TabsList>
-
                     <TabsContent value="content">
                       {/* Editor */}
                       <TiptapEditor
@@ -1152,18 +863,17 @@ export default function VaultPage() {
                         placeholder="Type '/' for commands..."
                         onAIResume={handleAIResume}
                         onSave={() => handleSaveContent(false)}
+                        aiResumeButton // Add this prop if TiptapEditor supports it
                       />
                     </TabsContent>
-
                     <TabsContent value="history">
                       <div className="border rounded-md p-4">
                         <h3 className="text-lg font-medium mb-4">Version History</h3>
-
                         {noteVersions.length === 0 ? (
                           <p className="text-muted-foreground">No previous versions available.</p>
                         ) : (
                           <div className="space-y-4">
-                            {noteVersions.map((version, index) => (
+                            {noteVersions.map((version) => (
                               <div key={version.id} className="border rounded-md p-3 hover:bg-muted/50">
                                 <div className="flex items-center justify-between mb-2">
                                   <div>
@@ -1204,7 +914,6 @@ export default function VaultPage() {
           </div>
         </div>
       </div>
-
       {/* Create dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
@@ -1238,15 +947,15 @@ export default function VaultPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* AI Resume Dialog */}
       <AIResumeDialog
         open={isAIResumeDialogOpen}
         onOpenChange={setIsAIResumeDialogOpen}
         text={selectedText}
         onApply={applyAISummary}
+        onGenerate={generateAISummary}
+        isGenerating={isGenerating}
       />
-
       {/* Save Success Animation */}
       <AnimatePresence>
         {showSaveSuccess && (
@@ -1261,7 +970,6 @@ export default function VaultPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* Toast notifications */}
       <Toaster />
     </div>

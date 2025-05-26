@@ -40,7 +40,7 @@ export function UserRoleProvider({ children }) {
 
   const canEditCollection = (collection) => {
     if (isAdmin) return true
-    if (isEditor && collection.owner?.id_profile === userId) return true
+    if (isEditor && collection.created_by === userId) return true
     if (collection.sharedWith) {
       const userShare = collection.sharedWith.find((share) =>
         typeof share === "object"
@@ -54,7 +54,7 @@ export function UserRoleProvider({ children }) {
 
   const canDeleteCollection = (collection) => {
     if (isAdmin) return true
-    if (isEditor && collection.owner?.id_profile === userId) return true
+    if (isEditor && collection.created_by === userId) return true
     return false
   }
 

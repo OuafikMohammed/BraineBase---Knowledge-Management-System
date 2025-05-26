@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import ResetPasswordModal from "./reset-password-modal";
 
 export default function LoginModal({ onLogin, onSignupClick }) {
   const [formData, setFormData] = useState({
@@ -42,31 +43,41 @@ export default function LoginModal({ onLogin, onSignupClick }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLoading) return; // Prevent double submission
     setIsLoading(true);
     setErrors({});
 
     try {
       const response = await api.post("/login", formData);
       // Store the token
-      localStorage.setItem('token', response.data.token)
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+      }
       // Store user role and id_profile
       if (response.data.user) {
-        localStorage.setItem('userRole', response.data.user.user_type || 'VIEWER')
+        localStorage.setItem('userRole', response.data.user.user_type || 'VIEWER');
         if (response.data.user.id_profile) {
-          localStorage.setItem('userId', response.data.user.id_profile)
+          localStorage.setItem('userId', response.data.user.id_profile);
         }
       }
-      onLogin(response.data)
-      setShowSuccess(true)
+      
+      setShowSuccess(true);
+      onLogin(response.data);
+      
+      // Wait for animation to complete before closing and reloading
       setTimeout(() => {
-        setIsOpen(false)
-      }, 1500)
+        setIsOpen(false);
+        setTimeout(() => {
+          window.location.reload();
+        }, 300); // Additional delay for modal close animation
+      }, 1500);
     } catch (error) {
       setErrors({
         general: error.response?.data?.message || "Invalid credentials. Please try again."
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   };
 
@@ -93,10 +104,28 @@ export default function LoginModal({ onLogin, onSignupClick }) {
               exit={{ opacity: 0, scale: 0.95 }}
               className="flex flex-col items-center justify-center p-4"
             >
-              <div className="rounded-full bg-green-500/20 p-3 mb-4">
-                <Check className="h-6 w-6 text-green-500" />
-              </div>
-              <p className="text-white text-lg font-semibold">Logged in successfully!</p>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="rounded-full bg-green-500/20 p-3 mb-4"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                >
+                  <Check className="h-6 w-6 text-green-500" />
+                </motion.div>
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="text-white text-lg font-semibold"
+              >
+                Logged in successfully!
+              </motion.p>
             </motion.div>
           ) : (
             <motion.form
@@ -124,10 +153,12 @@ export default function LoginModal({ onLogin, onSignupClick }) {
                 {errors.email && <p className="text-red-500 text-sm">{errors.email[0]}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-[#a0a0c0]">
-                  Password
-                </Label>
+              <div className="space-y-2">                <div className="flex justify-between items-center">
+                  <Label htmlFor="password" className="text-[#a0a0c0]">
+                    Password
+                  </Label>
+                  <ResetPasswordModal />
+                </div>
                 <Input
                   id="password"
                   name="password"
