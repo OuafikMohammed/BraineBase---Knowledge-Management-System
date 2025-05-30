@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Check, Search, X } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { collectionService } from '@/lib/collection-service'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export function ShareCollectionDialog({ 
   isOpen, 
@@ -24,7 +25,7 @@ export function ShareCollectionDialog({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedUsers, setSelectedUsers] = useState([])
   const [searchResults, setSearchResults] = useState([])
-  const [role, setRole] = useState('viewer')
+  const [role, setRole] = useState('view')
   const [isLoading, setIsLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const { toast } = useToast()
@@ -59,7 +60,7 @@ export function ShareCollectionDialog({
     // Debounce search
     const timeoutId = setTimeout(searchUsers, 300)
     return () => clearTimeout(timeoutId)
-  }, [searchQuery, selectedUsers])
+  }, [searchQuery, selectedUsers, toast])
 
   const handleSelectUser = (user) => {
     setSelectedUsers(prev => [...prev, user])
@@ -83,7 +84,7 @@ export function ShareCollectionDialog({
     try {
       await collectionService.shareCollection(collectionId, {
         users: selectedUsers.map(user => user.id),
-        role
+        permission: role
       })
 
       toast({ description: "Collection shared successfully" })
@@ -135,6 +136,10 @@ export function ShareCollectionDialog({
                     onClick={() => handleSelectUser(user)}
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-sm hover:bg-muted"
                   >
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={user.profileImage} alt={user.name} />
+                      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
                     <span className="flex-grow">{user.name}</span>
                     <span className="text-muted-foreground">{user.email}</span>
                   </button>
@@ -152,9 +157,15 @@ export function ShareCollectionDialog({
                     key={user.id}
                     className="flex items-center justify-between rounded-sm px-2 py-1 text-sm hover:bg-muted"
                   >
-                    <div>
-                      <span className="font-medium">{user.name}</span>
-                      <span className="ml-2 text-muted-foreground">{user.email}</span>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={user.profileImage} alt={user.name} />
+                        <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <span className="font-medium">{user.name}</span>
+                        <span className="ml-2 text-muted-foreground">{user.email}</span>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -170,14 +181,14 @@ export function ShareCollectionDialog({
           )}
 
           <div className="grid gap-2">
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">Permission Level</Label>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger id="role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="viewer">Viewer (can view and download)</SelectItem>
-                <SelectItem value="editor">Editor (can add and remove PDFs)</SelectItem>
+                <SelectItem value="view">Viewer (can view and download)</SelectItem>
+                <SelectItem value="edit">Editor (can add and remove PDFs)</SelectItem>
                 <SelectItem value="admin">Admin (can manage sharing)</SelectItem>
               </SelectContent>
             </Select>

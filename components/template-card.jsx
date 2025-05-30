@@ -22,16 +22,18 @@ export default function TemplateCard({ title, icon, description, features }) {
   }
 
   const { icon: IconComponent, link } = getIconAndLink()
-
   return (
     <motion.div
-      className="p-6 rounded-xl bg-[#1a1333] border border-[#7b4fff]/20 shadow-lg transition-all duration-300 hover:shadow-[#7b4fff]/10 group"
-      whileHover={{ y: -4 }}
+      className="p-6 rounded-xl bg-card border border-primary/20 shadow-lg transition-all duration-300 hover:shadow-primary/10 group"
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-3xl">{IconComponent}</span>
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#7b4fff] to-[#a67cfc] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
         
         <h3 className="text-xl font-semibold text-white">{title}</h3>

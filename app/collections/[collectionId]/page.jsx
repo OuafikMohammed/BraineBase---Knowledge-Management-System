@@ -49,6 +49,7 @@ import {
 import { ShareCollectionDialog } from "@/components/collections/share-collection-dialog"
 import { CollectionMembers } from "@/components/collections/collection-members"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 
 export default function CollectionPage() {
   const router = useRouter()
@@ -301,7 +302,28 @@ export default function CollectionPage() {
             >
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>
-            <div className="ml-4">              <h1 className="text-3xl font-bold">{collection.name}</h1>
+            <div className="ml-4">
+              <div className="flex items-center gap-4 mb-6">
+                <h1 className="text-2xl font-bold">{collection.name}</h1>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {collection.pdfs?.length || 0} PDFs
+                  </Badge>
+                  <Badge variant="secondary">
+                    <Users className="h-3 w-3 mr-1" />
+                    {collection.member_count || 1} Members
+                  </Badge>
+                  {collection.creator && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={collection.creator.profileImage} alt={collection.creator.name} />
+                        <AvatarFallback>{collection.creator.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span>Created by {collection.creator.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className="text-muted-foreground mt-1">{collection.description}</p>
             </div>
           </div>

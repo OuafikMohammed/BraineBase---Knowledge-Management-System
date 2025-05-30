@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
+import { useTheme } from "next-themes";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Menu, Home, FileText, FileEdit, Settings, Sun, Moon, X, LogOut, Database, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,31 +15,83 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { motion, AnimatePresence } from "framer-motion";
 import LoginModal from "@/components/login-modal";
 import SignupModal from "@/components/signup-modal";
 
-export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, onLogout, theme, toggleTheme }) {
+export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { theme, setTheme } = useTheme();
+
+  // After mounting, we can access the theme and restore it
+  useEffect(() => {
+    setMounted(true);
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, [setTheme]);
+
+  // Handle theme toggle and persistence
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  const navLinks = [
+    { href: '/pdfs', label: 'PDFs' },
+    { href: '/notes', label: 'Notes' },
+    { href: '/analytics', label: 'Analytics' },
+    { href: '/collections', label: 'Collections' },
+  ];
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-lg border-b border-[#7b4fff]/20">
-      <div className="absolute inset-0 bg-[#0e0a1a]/80" />
+    <header className="sticky top-0 z-50 backdrop-blur-lg border-b border-border/40">
+      <div className="absolute inset-0 bg-background/80" />
 
       <nav className="max-w-7xl mx-auto px-4 relative">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <motion.div
-            className="flex items-center"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Link href="/" className="text-xl font-bold text-white">
-              BraineBase
-            </Link>
-          </motion.div>
+          {/* Logo and Hamburger */}
+          <div className="flex items-center gap-4">
+            <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[80vw] sm:w-[350px] backdrop-blur-lg">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 mt-4">
+                  {navLinks.map((link) => (
+                    <SheetClose asChild key={link.href}>
+                      <Link 
+                        href={link.href}
+                        className="flex items-center gap-2 px-4 py-2 rounded-md hover:bg-accent/50 transition-colors"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        {link.label}
+                      </Link>
+                    </SheetClose>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Link href="/" className="text-xl font-bold flex items-center gap-2">
+                BraineBase
+              </Link>
+            </motion.div>
+          </div>
 
           {/* Desktop Navigation Links */}
           <motion.div
@@ -46,27 +100,37 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <Link href="/pdfs" className="text-[#a0a0c0] hover:text-white transition-colors">
-              PDFs
-            </Link>
-            <Link href="/notes" className="text-[#a0a0c0] hover:text-white transition-colors">
-              Notes
-            </Link>
-            <Link href="/analytics" className="text-[#a0a0c0] hover:text-white transition-colors">
-              Analytics
-            </Link>
-            <Link href="/collections" className="text-[#a0a0c0] hover:text-white transition-colors">
-              Collections
-            </Link>
+            {navLinks.map((link) => (
+              <Link 
+                key={link.href}
+                href={link.href} 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
           </motion.div>
 
-          {/* Auth Section */}
+          {/* Auth Section & Theme Toggle */}
           <motion.div
-            className="flex items-center space-x-4"
+            className="flex items-center gap-4"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="rounded-full"
+              aria-label="Toggle theme"
+            >
+              {mounted && theme === 'dark' ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+
             {!isLoggedIn ? (
               <div className="space-x-2">
                 <LoginModal onLogin={onLoginClick} onSignupClick={onSignupClick} />
@@ -104,18 +168,6 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="ml-2"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </Button>
           </motion.div>
         </div>
 

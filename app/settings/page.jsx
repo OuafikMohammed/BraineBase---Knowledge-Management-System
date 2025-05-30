@@ -1,10 +1,12 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -22,6 +24,8 @@ export default function SettingsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { role } = useUserRole()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
   // Profile State
   const [user, setUser] = useState(null)
@@ -50,6 +54,10 @@ export default function SettingsPage() {
 
   // Loading State
   const [isLoading, setIsLoading] = useState(false)
+  // After mounting, we have access to the theme
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Fetch user data on mount
   useEffect(() => {
@@ -239,13 +247,35 @@ export default function SettingsPage() {
     setConfirmResetPassword("")
     setResetErrors({})
   }
-
-  if (!isLoggedIn) return null
+  if (!isLoggedIn || !mounted) return null
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
       <div className="space-y-8">
+        {/* Theme Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>Customize your interface theme.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="theme-toggle">Dark Mode</Label>
+              <Switch
+                id="theme-toggle"
+                checked={theme === 'dark'}
+                onCheckedChange={(checked) => {
+                  setTheme(checked ? 'dark' : 'light')
+                  toast({
+                    title: "Theme Updated",
+                    description: `Theme switched to ${checked ? 'dark' : 'light'} mode.`
+                  })
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Profile Section */}
         <Card>

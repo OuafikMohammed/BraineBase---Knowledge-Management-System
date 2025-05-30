@@ -17,8 +17,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { useToast } from '@/components/ui/use-toast'
-import { MoreHorizontal, UserX } from 'lucide-react'
+import { MoreHorizontal, UserX, Shield, Eye, PenTool } from 'lucide-react'
 import { collectionService } from '@/lib/collection-service'
 
 export function CollectionMembers({ collectionId, onShareUpdate }) {
@@ -47,9 +48,9 @@ export function CollectionMembers({ collectionId, onShareUpdate }) {
     }
   }
 
-  const handleUpdateRole = async (userId, role) => {
+  const handleUpdateRole = async (userId, permission) => {
     try {
-      await collectionService.updateShare(collectionId, userId, role)
+      await collectionService.updateShare(collectionId, userId, permission)
       toast({ description: "Member role updated successfully" })
       loadMembers()
       if (onShareUpdate) {
@@ -87,16 +88,27 @@ export function CollectionMembers({ collectionId, onShareUpdate }) {
     }
   }
 
-  const getRoleLabel = (role) => {
-    switch (role) {
+  const getRoleIcon = (permission) => {
+    switch (permission) {
+      case 'admin':
+        return <Shield className="h-4 w-4 text-blue-500" />
+      case 'edit':
+        return <PenTool className="h-4 w-4 text-green-500" />
+      default:
+        return <Eye className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  const getRoleLabel = (permission) => {
+    switch (permission) {
       case 'admin':
         return 'Admin'
-      case 'editor':
+      case 'edit':
         return 'Editor'
-      case 'viewer':
+      case 'view':
         return 'Viewer'
       default:
-        return role
+        return permission
     }
   }
 
@@ -118,16 +130,25 @@ export function CollectionMembers({ collectionId, onShareUpdate }) {
                 key={member.user.id}
                 className="flex items-center justify-between rounded-lg border p-3"
               >
-                <div>
-                  <div className="font-medium">{member.user.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {member.user.email}
+                <div className="flex items-center space-x-3">
+                  <Avatar>
+                    <AvatarImage src={member.user.profileImage} alt={member.user.name} />
+                    <AvatarFallback>{member.user.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{member.user.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {member.user.email}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {getRoleLabel(member.role)}
-                  </span>
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted">
+                    {getRoleIcon(member.permission)}
+                    <span className="text-sm text-muted-foreground">
+                      {getRoleLabel(member.permission)}
+                    </span>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">
@@ -136,18 +157,21 @@ export function CollectionMembers({ collectionId, onShareUpdate }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onSelect={() => handleUpdateRole(member.user.id, 'viewer')}
+                        onSelect={() => handleUpdateRole(member.user.id, 'view')}
                       >
+                        <Eye className="h-4 w-4 mr-2" />
                         Make Viewer
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onSelect={() => handleUpdateRole(member.user.id, 'editor')}
+                        onSelect={() => handleUpdateRole(member.user.id, 'edit')}
                       >
+                        <PenTool className="h-4 w-4 mr-2" />
                         Make Editor
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => handleUpdateRole(member.user.id, 'admin')}
                       >
+                        <Shield className="h-4 w-4 mr-2" />
                         Make Admin
                       </DropdownMenuItem>
                       <DropdownMenuItem

@@ -1,40 +1,42 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
-import { useEffect } from 'react'
+import * as React from 'react';
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedBackground } from './animated-background';
 
-export function ThemeProvider({ children, ...props }) {
+export function ThemeProvider({ children, ...props }: { children: React.ReactNode; [key: string]: any }) {
+  const [mounted, setMounted] = useState(false);
+
+  // After mounting, we have access to the theme
   useEffect(() => {
-    // Set up intersection observer for scroll animations
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('animate-in');
-          observer.unobserve(entry.target); // Stop observing once animated
-        }
-      });
-    }, {
-      threshold: 0.1, // Trigger when 10% of the element is visible
-      rootMargin: '50px' // Start animation slightly before the element comes into view
-    });
-
-    // Observe all elements with animation classes
-    document.querySelectorAll('.animate-fade-up, .animate-slide-in, .animate-zoom').forEach(element => {
-      observer.observe(element);
-    });
-
-    return () => observer.disconnect();
+    setMounted(true);
   }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="dark"
-      enableSystem={false}
+      defaultTheme="system"
+      enableSystem
+      storageKey="theme"
       {...props}
     >
-      {children}
+      <AnimatedBackground />
+      <AnimatePresence mode="wait">
+        <motion.div
+          initial={false}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
     </NextThemesProvider>
   );
 }

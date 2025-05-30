@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 import Navbar from "@/components/navbar";
 import HeroSection from "@/components/hero-section";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -8,16 +9,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  const [theme, setTheme] = useState("light");
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    // Theme initialization
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    }
-
     // Check authentication status
     const token = localStorage.getItem("token");
     if (token) {
@@ -80,10 +74,7 @@ export default function Home() {
   };
 
   const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    setTheme(theme === "light" ? "dark" : "light");
   };
 
   return (
@@ -95,7 +86,7 @@ export default function Home() {
           onLogin={handleLogin}
           onSignup={handleSignup}
           onLogout={handleLogout}
-          theme={theme}
+          theme={theme || "system"}
           toggleTheme={toggleTheme}
         />
         <HeroSection />

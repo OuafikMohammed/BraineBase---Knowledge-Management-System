@@ -3,11 +3,13 @@
 import { useState, useEffect, createContext, useContext } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 import { ChevronLeft, ChevronRight, Home, FileText, FileEdit, Settings, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { cn } from "@/lib/utils"
 
 // Create a context for the sidebar
 const SidebarContext = createContext({
@@ -62,28 +64,47 @@ export function Sidebar() {
     email: "john.doe@example.com",
     image: "/path/to/image.jpg",
   }
-
   return (
     <motion.aside
-      className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-[#7b4fff]/20 bg-[#1a1333]/95 backdrop-blur-lg"
+      className={cn(
+        "fixed left-0 top-0 z-40 h-screen border-r backdrop-blur-lg",
+        "bg-background/95 border-border/40",
+        expanded ? "w-64" : "w-20"
+      )}
       initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
+      animate={{ 
+        x: 0, 
+        opacity: 1,
+        width: expanded ? 256 : 80,
+      }}
+      transition={{ 
+        duration: 0.3,
+        ease: "easeInOut"
+      }}
     >
       <div className="flex h-full flex-col overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-4">
           <Link href="/" className="flex items-center space-x-2">
-            <span className="text-xl font-bold text-white">BrainBase</span>
+            <span className={cn(
+              "text-xl font-bold transition-all duration-200",
+              expanded ? "opacity-100" : "opacity-0 w-0"
+            )}>
+              BrainBase
+            </span>
           </Link>
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="rounded-lg p-2 text-[#a0a0c0] hover:bg-[#7b4fff]/10 hover:text-white transition-colors md:hidden"
+          <motion.button
+            onClick={() => setExpanded(!expanded)}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <nav className="flex-1 space-y-1 px-2 py-4">
+            {expanded ? (
+              <ChevronLeft className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
+          </motion.button>
+        </div>        <nav className="flex-1 space-y-1 px-2 py-4">
           {navItems.map((item, index) => (
             <motion.div
               key={item.href}
@@ -93,36 +114,68 @@ export function Sidebar() {
             >
               <Link
                 href={item.href}
-                className={`group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                className={cn(
+                  "group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  "hover:bg-accent hover:text-accent-foreground",
                   pathname === item.href
-                    ? "bg-gradient-to-r from-[#7b4fff] to-[#a67cfc] text-white"
-                    : "text-[#a0a0c0] hover:bg-[#7b4fff]/10 hover:text-white"
-                }`}
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground",
+                  !expanded && "justify-center px-2"
+                )}
               >
-                {item.icon}
-                <span className="ml-3">{item.label}</span>
+                <motion.span
+                  initial={false}
+                  animate={{ 
+                    scale: expanded ? 1 : 1.2,
+                    marginRight: expanded ? "0.75rem" : "0" 
+                  }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {item.icon}
+                </motion.span>
+                {expanded && (
+                  <motion.span
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
               </Link>
             </motion.div>
           ))}
-        </nav>
-
-        <div className="border-t border-[#7b4fff]/20 p-4">
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-8 w-8 bg-[#7b4fff]/20">
-              <AvatarImage src={user?.image} />
-              <AvatarFallback className="text-white bg-gradient-to-br from-[#7b4fff] to-[#a67cfc]">
-                {user?.name?.charAt(0) || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">
-                {user?.name || "Guest"}
-              </p>
-              <p className="truncate text-xs text-[#a0a0c0]">
-                {user?.email || "Sign in to access all features"}
-              </p>
-            </div>
-          </div>
+        </nav>        <div className="border-t border-border/40 p-4">
+          <motion.div 
+            className="flex items-center space-x-4"
+            animate={{ justifyContent: expanded ? "flex-start" : "center" }}
+          >
+            <motion.div animate={{ scale: expanded ? 1 : 1.2 }}>
+              <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+                <AvatarImage src={user?.image} />
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {user?.name?.charAt(0) || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </motion.div>
+            {expanded && (
+              <motion.div 
+                className="min-w-0 flex-1"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <p className="truncate text-sm font-medium">
+                  {user?.name || "Guest"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {user?.email || "Sign in to access all features"}
+                </p>
+              </motion.div>
+            )}
+          </motion.div>
         </div>
       </div>
     </motion.aside>

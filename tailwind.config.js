@@ -15,46 +15,45 @@ module.exports = {
         "2xl": "1400px",
       },
     },
-    extend: {
-      colors: {
-        border: "#7b4fff",
-        input: "#1a1333",
+    extend: {      colors: {
+        border: "#e2e8f0",
+        input: "#f8fafc",
         ring: "#7b4fff",
-        background: "#0e0a1a",
-        foreground: "#ffffff",
-        surface: "#1a1333",
+        background: "#ffffff",
+        foreground: "#1a1333",
+        surface: "#f8fafc",
         primary: {
           DEFAULT: "#7b4fff",
           foreground: "#ffffff",
-          hover: "#a67cfc",
+          hover: "#6b3ee6"
         },
         secondary: {
-          DEFAULT: "#a0a0c0",
-          foreground: "#ffffff",
+          DEFAULT: "#f1f5f9",
+          foreground: "#1a1333"
         },
         destructive: {
-          DEFAULT: "#ff4f4f",
-          foreground: "#ffffff",
+          DEFAULT: "#ef4444",
+          foreground: "#ffffff"
         },
         muted: {
-          DEFAULT: "#1a1333",
-          foreground: "#a0a0c0",
+          DEFAULT: "#f1f5f9",
+          foreground: "#64748b"
         },
         accent: {
           DEFAULT: "#7b4fff",
-          foreground: "#ffffff",
+          foreground: "#ffffff"
         },
         popover: {
-          DEFAULT: "#1a1333",
-          foreground: "#ffffff",
+          DEFAULT: "#ffffff",
+          foreground: "#1a1333"
         },
         card: {
-          DEFAULT: "#1a1333",
-          foreground: "#ffffff",
+          DEFAULT: "#ffffff",
+          foreground: "#1a1333"
         },
         text: {
-          primary: "#ffffff",
-          secondary: "#a0a0c0",
+          primary: "#1a1333",
+          secondary: "#64748b"
         },
       },
       borderRadius: {
