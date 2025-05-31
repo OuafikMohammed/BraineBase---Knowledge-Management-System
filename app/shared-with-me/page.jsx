@@ -46,7 +46,7 @@ export default function SharedWithMePage() {
       
       fetchSharedCollections()
     } else {
-      router.push("/login")
+      router.push("/")
     }
   }, [router])
 

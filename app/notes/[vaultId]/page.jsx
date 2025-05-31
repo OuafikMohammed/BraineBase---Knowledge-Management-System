@@ -95,6 +95,13 @@ export default function VaultPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const { role, isAdmin, isEditor } = useUserRole()
 
+  const openCreateDialog = useCallback((type, parentId) => {
+    setCreateType(type)
+    setParentFolderId(parentId)
+    setNewItemName("")
+    setIsCreateDialogOpen(true)
+  }, [])
+
   // Cache invalidation timer
   useEffect(() => {
     const cacheInvalidationInterval = setInterval(() => {
@@ -449,6 +456,34 @@ export default function VaultPage() {
     }
   }
 
+  // Handle version restoration
+  const restoreVersion = async (version) => {
+    if (!activeItem || !version.content) return;
+    
+    try {
+      // Update editor content with the version content
+      if (editorRef.current) {
+        editorRef.current.setContent(version.content);
+      }
+      
+      // Save the restored content
+      await handleSaveContent(false);
+      
+      toast({
+        title: "Version restored",
+        description: `Successfully restored version ${version.id}`,
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Error restoring version:", error);
+      toast({
+        title: "Error",
+        description: "Failed to restore version",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Add tag
   const addTag = () => {
     if (!newTag.trim()) return
@@ -652,6 +687,98 @@ export default function VaultPage() {
         })
     }
   }
+
+  // Handle starting drag operation
+  const handleDragStart = (e, item) => {
+    e.stopPropagation();
+    setDraggedItem(item);
+    e.dataTransfer.setData('text/plain', item.id_element);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  // Handle when an item is being dragged over another item
+  const handleDragOver = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only allow dropping on folders
+    if (item.element_type === 'FOLDER') {
+      e.dataTransfer.dropEffect = 'move';
+      setDragOverItem(item);
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+      setDragOverItem(null);
+    }
+  };
+
+  // Handle dropping an item into a folder
+  const handleDrop = async (e, targetFolder) => {
+    e.preventDefault();
+    if (!draggedItem || !targetFolder || draggedItem.id_element === targetFolder.id_element) return;
+
+    // Prevent dropping a parent folder into its own child folder
+    if (targetFolder.element_type === 'FOLDER' && draggedItem.element_type === 'FOLDER') {
+      const descendants = getDescendantIds(draggedItem);
+      if (descendants.includes(targetFolder.id_element)) {
+        toast({
+          title: "Invalid move",
+          description: "Cannot move a folder into its own subfolder",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Don't move if already in the target folder
+    if (draggedItem.id_parent === targetFolder.id_element) return;
+
+    try {
+      await vaultService.updateElementParent(draggedItem.id_element, targetFolder.id_element);
+      
+      const updatedItems = vault.items.map((item) =>
+        item.id_element === draggedItem.id_element
+          ? { ...item, id_parent: targetFolder.id_element }
+          : item
+      );
+
+      setVault({ ...vault, items: updatedItems });
+      setDraggedItem(null);
+      setDragOverItem(null);
+
+      // Ensure the target folder is expanded
+      setExpandedFolders(prev => ({
+        ...prev,
+        [targetFolder.id_element]: true
+      }));
+
+      toast({
+        title: "Item moved",
+        description: `"${draggedItem.name}" moved to "${targetFolder.name}"`,
+      });
+    } catch (error) {
+      console.error("Error moving item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to move item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Helper function to get all descendant IDs of a folder
+  const getDescendantIds = (folder) => {
+    const descendants = [];
+    const childItems = getChildItems(folder.id_element);
+    
+    childItems.forEach(child => {
+      descendants.push(child.id_element);
+      if (child.element_type === 'FOLDER') {
+        descendants.push(...getDescendantIds(child));
+      }
+    });
+
+    return descendants;
+  };
 
   if (!vault) {
     return (
@@ -882,7 +1009,11 @@ export default function VaultPage() {
                                       {formatDate(version.date)}
                                     </span>
                                   </div>
-                                  <Button variant="outline" size="sm" onClick={() => restoreVersion(version)}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => restoreVersion(version)}
+                                  >
                                     Restore
                                   </Button>
                                 </div>

@@ -81,7 +81,7 @@ export default function SettingsPage() {
         setIsLoggedIn(true)
       } catch (error) {
         console.error('Error fetching user data:', error)
-        router.push('/login')
+        router.push('/')
       }
     }
     fetchUserData()
