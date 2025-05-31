@@ -4,26 +4,48 @@
 
 @layer base {
   :root {
-    --background: #ffffff;
-    --foreground: #1a1333;
-    --card: #ffffff;
-    --card-foreground: #1a1333;
-    --popover: #ffffff;
-    --popover-foreground: #1a1333;
-    --primary: #7b4fff;
-    --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #1a1333;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    --accent: #7b4fff;
-    --accent-foreground: #ffffff;
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #f8fafc;
-    --ring: #7b4fff;
+    --background: 0 0% 100%;
+    --foreground: 259 45% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 259 45% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 259 45% 15%;
+    --primary: 262 100% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 259 45% 15%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 240 10% 50%;
+    --accent: 262 100% 62%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 100% 62%;
     --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 259 45% 7%;
+    --foreground: 0 0% 100%;
+    --card: 259 45% 14%;
+    --card-foreground: 210 40% 98%;
+    --popover: 259 45% 14%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262 100% 62%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 262 100% 62%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 259 45% 20%;
+    --input: 259 45% 20%;
+    --ring: 262 100% 62%;
   }
 }
 
@@ -52,57 +74,66 @@
 @layer components {
   /* Card Styles */
   .card-gradient {
-    @apply bg-background border border-border/50 rounded-lg shadow-lg 
-    shadow-accent/10 transition-all duration-300;
+    @apply bg-background border border-border/50 rounded-lg shadow-lg shadow-accent/5 transition-all duration-300;
   }
 
   .card-gradient:hover {
-    @apply shadow-xl shadow-accent/20;
+    @apply shadow-xl shadow-accent/10;
     transform: translateY(-2px);
   }
 
   /* Button Styles */
   .btn-primary {
-    @apply bg-[#7b4fff] text-white rounded-lg px-4 py-2 font-medium 
-    shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 
-    hover:bg-[#6b3ee6] transition-all duration-300;
+    @apply bg-gradient-primary text-white rounded-lg px-4 py-2 font-medium shadow-md shadow-accent/20 transition-all duration-300;
+  }
+
+  .btn-primary:hover {
+    @apply shadow-lg shadow-accent/30;
   }
 
   .btn-create {
-    @apply bg-[#7b4fff] text-white rounded-lg px-4 py-2 font-medium 
-    shadow-md shadow-accent/20 hover:shadow-lg hover:shadow-accent/30 
-    hover:bg-[#6b3ee6] transition-all duration-300;
+    @apply bg-gradient-create text-white rounded-lg px-4 py-2 font-medium shadow-md transition-all duration-300;
+  }
+
+  .btn-create:hover {
+    @apply shadow-lg shadow-create/30;
   }
 
   .btn-read {
-    @apply bg-[#f1f5f9] text-[#1a1333] rounded-lg px-4 py-2 font-medium 
-    shadow-md shadow-secondary/20 hover:shadow-lg hover:shadow-secondary/30 
-    hover:bg-[#e2e8f0] transition-all duration-300;
+    @apply bg-gradient-read text-white rounded-lg px-4 py-2 font-medium shadow-md transition-all duration-300;
+  }
+
+  .btn-read:hover {
+    @apply shadow-lg shadow-read/30;
   }
 
   .btn-update {
-    @apply bg-[#f1f5f9] text-[#64748b] rounded-lg px-4 py-2 font-medium 
-    shadow-md shadow-muted/20 hover:shadow-lg hover:shadow-muted/30 
-    hover:bg-[#e2e8f0] transition-all duration-300;
+    @apply bg-gradient-update text-white rounded-lg px-4 py-2 font-medium shadow-md transition-all duration-300;
+  }
+
+  .btn-update:hover {
+    @apply shadow-lg shadow-update/30;
   }
 
   .btn-delete {
-    @apply bg-[#ef4444] text-white rounded-lg px-4 py-2 font-medium 
-    shadow-md shadow-destructive/20 hover:shadow-lg hover:shadow-destructive/30 
-    hover:bg-[#dc2626] transition-all duration-300;
+    @apply bg-gradient-delete text-white rounded-lg px-4 py-2 font-medium shadow-md transition-all duration-300;
+  }
+
+  .btn-delete:hover {
+    @apply shadow-lg shadow-delete/30;
   }
 
   /* Badge Styles */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors;
   }
 
   .badge-primary {
-    @apply bg-[#7b4fff] text-white;
+    @apply bg-gradient-primary text-white;
   }
 
   .badge-create {
-    @apply bg-[#7b4fff] text-white;
+    @apply bg-gradient-create text-white;
   }
 
   .badge-read {

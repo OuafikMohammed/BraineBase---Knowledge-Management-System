@@ -15,45 +15,69 @@ module.exports = {
         "2xl": "1400px",
       },
     },
-    extend: {      colors: {
-        border: "#e2e8f0",
-        input: "#f8fafc",
-        ring: "#7b4fff",
-        background: "#ffffff",
-        foreground: "#1a1333",
-        surface: "#f8fafc",
+    extend: {
+      colors: {
+        border: {
+          DEFAULT: "hsl(var(--border))",
+          light: "#e2e8f0"
+        },
+        input: {
+          DEFAULT: "hsl(var(--input))",
+          light: "#f8fafc"
+        },
+        ring: {
+          DEFAULT: "hsl(var(--ring))",
+          light: "#7b4fff"
+        },
+        background: {
+          DEFAULT: "hsl(var(--background))",
+          light: "#ffffff"
+        },
+        foreground: {
+          DEFAULT: "hsl(var(--foreground))",
+          light: "#1a1333"
+        },
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          light: "#f8fafc"
+        },
         primary: {
           DEFAULT: "#7b4fff",
           foreground: "#ffffff",
-          hover: "#6b3ee6"
+          hover: "#a67cfc",
+          light: {
+            DEFAULT: "#7b4fff",
+            foreground: "#ffffff",
+            hover: "#6b3ee6"
+          }
         },
         secondary: {
-          DEFAULT: "#f1f5f9",
-          foreground: "#1a1333"
+          DEFAULT: "#a0a0c0",
+          foreground: "#ffffff",
         },
         destructive: {
-          DEFAULT: "#ef4444",
-          foreground: "#ffffff"
+          DEFAULT: "#ff4f4f",
+          foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "#f1f5f9",
-          foreground: "#64748b"
+          DEFAULT: "#1a1333",
+          foreground: "#a0a0c0",
         },
         accent: {
           DEFAULT: "#7b4fff",
-          foreground: "#ffffff"
+          foreground: "#ffffff",
         },
         popover: {
-          DEFAULT: "#ffffff",
-          foreground: "#1a1333"
+          DEFAULT: "#1a1333",
+          foreground: "#ffffff",
         },
         card: {
-          DEFAULT: "#ffffff",
-          foreground: "#1a1333"
+          DEFAULT: "#1a1333",
+          foreground: "#ffffff",
         },
         text: {
-          primary: "#1a1333",
-          secondary: "#64748b"
+          primary: "#ffffff",
+          secondary: "#a0a0c0",
         },
       },
       borderRadius: {
