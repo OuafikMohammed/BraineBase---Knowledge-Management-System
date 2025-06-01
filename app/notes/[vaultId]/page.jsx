@@ -1,7 +1,17 @@
 "use client"
-import { useState, useEffect, useRef, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { AnimatePresence, motion } from "framer-motion"
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import Navbar from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -94,6 +104,8 @@ export default function VaultPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const { role, isAdmin, isEditor } = useUserRole()
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false)
+  const [versionToRestore, setVersionToRestore] = useState(null)
 
   const openCreateDialog = useCallback((type, parentId) => {
     setCreateType(type)
@@ -137,21 +149,7 @@ export default function VaultPage() {
     if (!selectedText) return
     setIsGenerating(true)
     try {
-      const summary = await generateResumeSummary({
-        token: GITHUB_TOKEN,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that generates concise, professional resume bullet points from selected text.'
-          },
-          {
-            role: 'user',
-            content: selectedText
-          }
-        ],
-        temperature: 0.7,
-        top_p: 0.7
-      })
+      const summary = await generateResumeSummary(selectedText, GITHUB_TOKEN)
       applyAISummary(summary)
       toast({
         title: "Summary Generated",
@@ -456,24 +454,56 @@ export default function VaultPage() {
     }
   }
 
+  // Initiate version restoration
+  const handleRestoreClick = (version) => {
+    setVersionToRestore(version);
+    setShowRestoreDialog(true);
+  };
+
   // Handle version restoration
-  const restoreVersion = async (version) => {
-    if (!activeItem || !version.content) return;
+  const restoreVersion = async () => {
+    if (!activeItem || !versionToRestore?.id) return;
     
     try {
-      // Update editor content with the version content
+      // Call the API to restore the version
+      const updatedElement = await vaultService.restoreVersion(activeItem.id_element, versionToRestore.id);
+      
+      // Update the editor content with the restored version
       if (editorRef.current) {
-        editorRef.current.setContent(version.content);
+        editorRef.current.setContent(updatedElement.content_html);
       }
       
-      // Save the restored content
-      await handleSaveContent(false);
+      // Update the active item and vault state
+      const updatedItems = vault.items.map((item) => {
+        if (item.id_element === activeItem.id_element) {
+          return {
+            ...item,
+            content_html: updatedElement.content_html,
+            versions: updatedElement.versions
+          }
+        }
+        return item;
+      });
       
+      setVault({ ...vault, items: updatedItems });
+      setActiveItem({
+        ...activeItem,
+        content_html: updatedElement.content_html,
+        versions: updatedElement.versions
+      });
+      
+      // Show success message
       toast({
         title: "Version restored",
-        description: `Successfully restored version ${version.id}`,
+        description: `Successfully restored version ${versionToRestore.id}`,
         variant: "success",
       });
+
+      // Close dialog
+      setShowRestoreDialog(false);
+      setVersionToRestore(null);
+      setLastSaved(new Date());
+      setContentChanged(false);
     } catch (error) {
       console.error("Error restoring version:", error);
       toast({
@@ -1012,7 +1042,7 @@ export default function VaultPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => restoreVersion(version)}
+                                    onClick={() => handleRestoreClick(version)}
                                   >
                                     Restore
                                   </Button>
@@ -1103,6 +1133,27 @@ export default function VaultPage() {
       </AnimatePresence>
       {/* Toast notifications */}
       <Toaster />
+
+      {/* Restore Version Dialog */}
+      <AlertDialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore Version {versionToRestore?.id}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to restore this version? This will replace your current content with the version shown below.
+              <div className="mt-4 p-4 bg-muted/50 rounded-md">
+                <div className="prose prose-sm dark:prose-invert max-h-[200px] overflow-y-auto" dangerouslySetInnerHTML={{ __html: versionToRestore?.content }} />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={restoreVersion}>
+              Restore Version
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,33 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/AuthContext"
-import { useToast } from "@/components/ui/use-toast"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { FileText, Download, Edit, Trash2, ArrowLeft, Search, Users, Globe, Lock, MoreHorizontal, Eye } from "lucide-react"
-import PdfViewer from "@/components/pdfs/pdf-viewer"
-import { pdfService } from "@/lib/pdf-service"
 import { collectionService } from "@/lib/collection-service"
+import { pdfService } from "@/lib/pdf-service"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -46,131 +27,189 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { ShareCollectionDialog } from "@/components/collections/share-collection-dialog"
-import { CollectionMembers } from "@/components/collections/collection-members"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Label } from "@/components/ui/label"
+import {
+  ArrowLeft,
+  FileText,
+  Eye,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Download,
+  Search,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from "@/components/ui/use-toast"
+import { useUserRole } from "@/components/user-role-context"
 
 export default function CollectionPage() {
-  const router = useRouter()
   const params = useParams()
+  const router = useRouter()
   const { toast } = useToast()
-  const { user, isLoggedIn, isLoading: authLoading } = useAuth()
+  const { role } = useUserRole()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [user, setUser] = useState(null)
 
+  const collectionId = params.collectionId
   const [collection, setCollection] = useState(null)
   const [pdfs, setPdfs] = useState([])
-  const [isLoading, setIsLoading] = useState(true)  
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
   // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [showRenameDialog, setShowRenameDialog] = useState(false)
-  const [showPdfViewer, setShowPdfViewer] = useState(false)
-  const [showShareDialog, setShowShareDialog] = useState(false)
-  const [showMembersDialog, setShowMembersDialog] = useState(false)
-  
-  // PDF states
-  const [selectedPdf, setSelectedPdf] = useState(null)
   const [pdfToDelete, setPdfToDelete] = useState(null)
-  const [pdfToRename, setPdfToRename] = useState(null)
+  const [showModifyDialog, setShowModifyDialog] = useState(false)
+  const [pdfToModify, setPdfToModify] = useState(null)
   const [newPdfName, setNewPdfName] = useState("")
 
-  const collectionId = params.collectionId
+  // Check authentication state on mount
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    const userId = localStorage.getItem("userId")
+    const userName = localStorage.getItem("userName")
+    const userEmail = localStorage.getItem("userEmail")
+    const userRole = localStorage.getItem("userRole")
+    
+    if (token && userId) {
+      setIsLoggedIn(true)
+      setUser({
+        id: parseInt(userId),
+        name: userName,
+        email: userEmail,
+        status: userRole || "Viewer",
+        profileType: "Standard",
+        profileImage: "/placeholder.svg?height=40&width=40"
+      })
+    } else {
+      router.push("/login")
+    }
+  }, [router])
 
-  // 📁 Load collection and PDFs
+  // Fetch collection and its PDFs
   useEffect(() => {
     const fetchData = async () => {
-      if (authLoading || !isLoggedIn || !collectionId) return;
-
       try {
-        setIsLoading(true);
-        console.log("Fetching collection:", collectionId);
+        setIsLoading(true)
+        const token = localStorage.getItem("token")
+        if (!token) {
+          router.push("/login")
+          return
+        }        // Fetch collection data
+        const collectionData = await collectionService.getCollection(collectionId)
+        setCollection(collectionData)
 
-        const [collectionData, pdfsData] = await Promise.all([
-          collectionService.getCollection(collectionId),
-          collectionService.getCollectionPdfs(collectionId),
-        ]);
-
-        if (!collectionData) {
-          console.error("No collection data received");
-          toast({
-            title: "Error",
-            description: "Collection not found",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        console.log("Collection data received:", {
-          id: collectionData.id,
-          name: collectionData.name,
-          pdfsCount: pdfsData?.length || 0
-        });
-
-        setCollection(collectionData);
-        setPdfs(pdfsData || []);
+        // Fetch PDFs in this collection
+        const pdfsData = await collectionService.getCollectionPdfs(collectionId)
+        setPdfs(pdfsData)
       } catch (error) {
-        console.error("Error fetching collection data:", {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        });
-        
-        const errorMessage = 
-          error.response?.status === 404 ? "Collection not found" :
-          error.response?.status === 403 ? "Access denied" :
-          "Failed to load collection";
-
+        console.error("Error fetching collection data:", error)
         toast({
           title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        
-        if (error.response?.status === 401) {
-          router.push("/login");
-        }
+          description: "Failed to load collection",
+          variant: "destructive"
+        })
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchData();
-  }, [collectionId, toast, router, isLoggedIn, authLoading])
+    if (collectionId) {
+      fetchData()
+    }
+  }, [collectionId, router, toast])
 
-  // Handler functions
-  const handleViewPdf = async (pdf) => {
+  // Filter PDFs based on search
+  const filteredPDFs = pdfs.filter(
+    (pdf) =>
+      pdf.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pdf.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pdf.category?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Check permissions
+  const isOwner = collection?.owner?.id === parseInt(localStorage.getItem("userId"))
+  const userRole = localStorage.getItem("userRole")
+  const userPermission = collection?.sharedWith?.find(
+    share => share.userId === parseInt(localStorage.getItem("userId"))
+  )?.permission
+
+  // Handle PDF operations
+  const handleDeletePdf = (pdfId) => {
+    setPdfToDelete(pdfId)
+    setShowDeleteDialog(true)
+  }
+  const confirmDeletePdf = async () => {
     try {
-      // Open PDF in the viewer
-      setSelectedPdf(pdf)
-      setShowPdfViewer(true)
+      await collectionService.removePdfFromCollection(collectionId, pdfToDelete)
+      setPdfs(prev => prev.filter(pdf => pdf.id !== pdfToDelete))
+      setShowDeleteDialog(false)
+      setPdfToDelete(null)
+      toast({
+        description: "PDF removed from collection successfully"
+      })
     } catch (error) {
-      console.error('Error viewing PDF:', error)
+      console.error("Error removing PDF:", error)
       toast({
         title: "Error",
-        description: "Failed to view PDF",
+        description: "Failed to remove PDF from collection",
         variant: "destructive"
       })
     }
   }
 
-  const handleDownloadPdf = async (pdfId) => {
+  const handleModifyPdf = (pdfId) => {
+    const pdf = pdfs.find(p => p.id === pdfId)
+    setPdfToModify(pdfId)
+    setNewPdfName(pdf.title)
+    setShowModifyDialog(true)
+  }
+  const confirmModifyPdf = async () => {
+    try {
+      const updatedPdf = await pdfService.updatePdf(pdfToModify, { title: newPdfName })
+      setPdfs(prev => prev.map(pdf => pdf.id === pdfToModify ? updatedPdf : pdf))
+      setShowModifyDialog(false)
+      setPdfToModify(null)
+      toast({
+        description: "PDF renamed successfully"
+      })
+    } catch (error) {
+      console.error("Error modifying PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to rename PDF",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleView = (pdfId) => {
+    router.push(`/pdfs/${pdfId}`)
+  }
+  const handleDownload = async (pdfId) => {
     try {
       const blob = await pdfService.downloadPdf(pdfId)
-      const url = URL.createObjectURL(blob)
+      const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const pdf = pdfs.find(p => p.id === pdfId)
-      a.download = pdf?.title ? `${pdf.title}.pdf` : `document-${pdfId}.pdf`
+      a.download = pdfs.find(p => p.id === pdfId)?.title || 'document.pdf'
       document.body.appendChild(a)
       a.click()
+      window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      URL.revokeObjectURL(url)
       toast({
         description: "PDF downloaded successfully"
       })
     } catch (error) {
-      console.error('Error downloading PDF:', error)
+      console.error("Error downloading PDF:", error)
       toast({
         title: "Error",
         description: "Failed to download PDF",
@@ -179,497 +218,192 @@ export default function CollectionPage() {
     }
   }
 
-  const handleRenamePdf = (pdfId) => {
-    const pdf = pdfs.find(p => p.id === pdfId)
-    if (pdf) {
-      setPdfToRename(pdfId)
-      setNewPdfName(pdf.title)
-      setShowRenameDialog(true)
-    }
-  }
-
-  const handleDeletePdf = (pdfId) => {
-    setPdfToDelete(pdfId)
-    setShowDeleteDialog(true)
-  }
-
-  const confirmDeletePdf = async () => {
-    try {
-      await collectionService.removePdfFromCollection(collectionId, pdfToDelete)
-      setPdfs(prev => prev.filter(pdf => pdf.id !== pdfToDelete))
-      setShowDeleteDialog(false)
-      setPdfToDelete(null)
-      toast({ description: "PDF removed from collection successfully" })
-    } catch (error) {
-      console.error('Error removing PDF from collection:', error)
-      toast({
-        title: "Error",
-        description: "Failed to remove PDF from collection",
-        variant: "destructive"
-      })
-    }
-  }
-  const confirmRenamePdf = async () => {
-    if (!newPdfName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "PDF title cannot be empty",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const updatedPdf = await collectionService.updatePdfInCollection(
-        collectionId,
-        pdfToRename,
-        { title: newPdfName }
-      )
-      setPdfs((prev) =>
-        prev.map((pdf) => (pdf.id === pdfToRename ? updatedPdf : pdf))
-      )
-      toast({ description: "PDF renamed successfully" })
-    } catch (error) {
-      console.error("Error renaming PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to rename PDF",
-        variant: "destructive",
-      })
-    } finally {
-      setShowRenameDialog(false)
-      setPdfToRename(null)
-      setNewPdfName("")
-    }
-  }
-
-  // 🧠 Filter PDFs
-  const filteredPDFs = pdfs.filter(
-    (pdf) =>
-      (pdf.title?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-      (pdf.description?.toLowerCase() || "").includes(searchQuery.toLowerCase())
-  )
-
-  // 🔐 Permissions
-  const isOwner = collection?.created_by === user?.id;
-
-  // 🧩 Render Safely
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading collection...
-      </div>
-    )
-  }
-
-  if (!collection) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <h2>Collection not found</h2>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Navbar */}
-      <Navbar
-        isLoggedIn={isLoggedIn}
-        user={user}
-        onLogout={() => {
-          if (typeof window !== "undefined") {
+      <div className="min-h-screen flex flex-col">
+        <Navbar
+          isLoggedIn={isLoggedIn}
+          user={user}
+          onLogout={() => {
             localStorage.removeItem("token")
             localStorage.removeItem("userId")
             localStorage.removeItem("userName")
             localStorage.removeItem("userEmail")
             localStorage.removeItem("userRole")
-          }
+            setIsLoggedIn(false)
+            setUser(null)
+            router.push("/")
+          }}
+        />
+        <div className="flex-grow flex items-center justify-center">
+          <p>Loading collection...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar
+        isLoggedIn={isLoggedIn}
+        user={user}
+        onLogout={() => {
+          localStorage.removeItem("token")
+          localStorage.removeItem("userId")
+          localStorage.removeItem("userName")
+          localStorage.removeItem("userEmail")
+          localStorage.removeItem("userRole")
           setIsLoggedIn(false)
           setUser(null)
           router.push("/")
         }}
       />
-
-      {/* Main Content */}
-      <main className="flex-grow container mx-auto py-10 px-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/collections")}
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
-            <div className="ml-4">
-              <div className="flex items-center gap-4 mb-6">
-                <h1 className="text-2xl font-bold">{collection.name}</h1>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {collection.pdfs?.length || 0} PDFs
+      <div className="flex-grow container mx-auto py-10 px-4">
+        {collection ? (
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div className="flex items-center">
+              <Button variant="ghost" size="sm" asChild className="mr-2">
+                <a href="/collections">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to Collections
+                </a>
+              </Button>
+              <div>
+                <div className="flex items-center">
+                  <h1 className="text-3xl font-bold">{collection.name}</h1>
+                  <Badge variant="outline" className="ml-2 flex items-center gap-1">
+                    <span>{collection.visibility}</span>
                   </Badge>
-                  <Badge variant="secondary">
-                    <Users className="h-3 w-3 mr-1" />
-                    {collection.member_count || 1} Members
-                  </Badge>
-                  {collection.creator && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Avatar className="h-5 w-5">
-                        <AvatarImage src={collection.creator.profileImage} alt={collection.creator.name} />
-                        <AvatarFallback>{collection.creator.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <span>Created by {collection.creator.name}</span>
-                    </div>
-                  )}
                 </div>
+                <p className="text-muted-foreground mt-1">{collection.description}</p>
               </div>
-              <p className="text-muted-foreground mt-1">{collection.description}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {(isOwner || collection?.canManageShares) && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowMembersDialog(true)}
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Members
-                </Button>
-                <Button onClick={() => setShowShareDialog(true)}>
-                  Share
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
+        ) : null}
 
-        {/* Search */}
-        <div className="mb-6 relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <Input
             type="text"
             placeholder="Search PDFs..."
+            className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
           />
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="grid" className="w-full">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">PDFs in Collection</h2>
-            <TabsList>
-              <TabsTrigger value="grid">Grid</TabsTrigger>
-              <TabsTrigger value="list">List</TabsTrigger>
-            </TabsList>
-          </div>
-
-          {/* Grid View */}
-          <TabsContent value="grid" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredPDFs.length > 0 ? (
-                filteredPDFs.map((pdf) => (
-                  <Card key={pdf.id}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center text-base">
-                        <FileText className="h-5 w-5 mr-2" />
-                        <span>{pdf.title || "Untitled PDF"}</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {pdf.description || "No description"}
-                      </p>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center space-x-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={pdf.user?.avatar} />
-                            <AvatarFallback>
-                              {pdf.user?.name?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm text-muted-foreground">
-                            Added by {pdf.user?.name || 'Unknown user'}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewPdf(pdf)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf(pdf.id)}>
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleRenamePdf(pdf.id)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Rename
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-destructive"
-                                onClick={() => handleDeletePdf(pdf.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Remove
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <div className="flex items-center justify-between mt-4">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewPdf(pdf)}
-                          className="flex items-center gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadPdf(pdf.id)}
-                          className="flex items-center gap-2"
-                        >
-                          <Download className="h-4 w-4" />
-                          Download
-                        </Button>
-                      </div>
-                      {isOwner && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleRenamePdf(pdf.id)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleDeletePdf(pdf.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </Card>
-                ))
-              ) : (
-                <div className="col-span-full text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No PDFs Found</h3>
-                  <p className="text-muted-foreground">
-                    {searchQuery
-                      ? "We couldn't find any PDFs matching your search."
-                      : "This collection is empty. Add some PDFs to get started."}
-                  </p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* List View */}
-          <TabsContent value="list" className="mt-0">
-            <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
-              <div className="grid grid-cols-12 gap-4 p-4 font-medium border-b">
-                <div className="col-span-6">Document</div>
-                <div className="col-span-3">Added</div>
-                <div className="col-span-3">Size</div>
-                <div className="col-span-0 sm:col-span-3"></div>
-              </div>
-
-              {filteredPDFs.length > 0 ? (
-                filteredPDFs.map((pdf) => (
-                  <div
-                    key={pdf.id}
-                    className="grid grid-cols-12 gap-4 p-4 hover:bg-muted/50 transition-colors"
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPDFs.length > 0 ? (
+            filteredPDFs.map((pdf) => (
+              <Card key={pdf.id} className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-start text-base">
+                    <FileText className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <span>{pdf.title}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">{pdf.description}</p>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Category: {pdf.category}</span>
+                    <span>Size: {pdf.size}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <span>Added: {pdf.date}</span>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleView(pdf.id)}
+                    className="flex items-center"
                   >
-                    <div className="col-span-6 flex items-center gap-2 truncate">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium truncate">
-                        {pdf.title || "Untitled"}
-                      </span>
-                    </div>
-                    <div className="col-span-3 flex items-center">
-                      <span className="text-sm">
-                        {new Date(pdf.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="col-span-3 flex items-center">
-                      <span className="text-sm">
-                        {(pdf.size / 1024).toFixed(2)} KB
-                      </span>
-                    </div>
-                    <div className="col-span-0 sm:col-span-3 flex items-center justify-end space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDownloadPdf(pdf.id)}
-                        title="Download"
-                      >
-                        <Download className="h-4 w-4" />
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
                       </Button>
-                      {isOwner && (
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {(isOwner || userRole === "ADMIN" || userPermission === "EDIT") && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRenamePdf(pdf.id)}
-                            title="Rename"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeletePdf(pdf.id)}
-                            title="Remove"
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Modify
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeletePdf(pdf.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove from Collection
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                         </>
                       )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-12 col-span-full">
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No PDFs Found</h3>
-                  <p className="text-muted-foreground">
-                    {searchQuery
-                      ? "We couldn't find any PDFs matching your search."
-                      : "This collection is empty. Add some PDFs to get started."}
-                  </p>
-                </div>
-              )}
+                      <DropdownMenuItem onClick={() => handleDownload(pdf.id)}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardFooter>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No PDFs Found</h3>
+              <p className="text-muted-foreground">
+                {searchQuery
+                  ? "We couldn't find any PDFs matching your search criteria."
+                  : "This collection is empty. Add PDFs from the PDFs page."}
+              </p>
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+          )}
+        </div>
+      </div>
 
       <Footer />
 
-      {/* Delete PDF Dialog */}
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent aria-describedby="remove-pdf-description">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove the PDF from this collection.
+            <AlertDialogTitle>Remove from Collection?</AlertDialogTitle>
+            <AlertDialogDescription id="remove-pdf-description">
+              This will remove the PDF from this collection. The PDF will still be available in your library.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeletePdf}
-              className="bg-destructive text-destructive-foreground"
-            >
-              Remove
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeletePdf}>Remove</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Rename PDF Dialog */}
-      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
-        <DialogContent>
+      {/* Modify PDF Dialog */}
+      <Dialog open={showModifyDialog} onOpenChange={setShowModifyDialog}>
+        <DialogContent aria-describedby="modify-pdf-description">
           <DialogHeader>
             <DialogTitle>Rename PDF</DialogTitle>
-            <DialogDescription>
-              Enter a new name for the PDF.
-            </DialogDescription>
+            <DialogDescription id="modify-pdf-description">Enter a new name for your PDF document.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={newPdfName}
-                onChange={(e) => setNewPdfName(e.target.value)}
-              />
+              <Label htmlFor="pdf-name">PDF Name</Label>
+              <Input id="pdf-name" value={newPdfName} onChange={(e) => setNewPdfName(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowRenameDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowModifyDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={confirmRenamePdf}>
-              Save Changes
-            </Button>
+            <Button onClick={confirmModifyPdf}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Share Dialog */}
-      <ShareCollectionDialog
-        isOpen={showShareDialog}
-        onClose={() => setShowShareDialog(false)}
-        collectionId={collectionId}
-        onShare={() => {
-          // Refresh collection data to get updated sharing settings
-          collectionService.getCollection(collectionId).then(setCollection)
-        }}
-      />
-
-      {/* Members Management Dialog */}
-      <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Collection Members</DialogTitle>
-            <DialogDescription>
-              Manage who has access to this collection and their roles
-            </DialogDescription>
-          </DialogHeader>
-          <CollectionMembers
-            collectionId={collectionId}
-            onShareUpdate={() => {
-              // Refresh collection data to get updated sharing settings
-              collectionService.getCollection(collectionId).then(setCollection)
-            }}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMembersDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* PDF Viewer */}
-      <PdfViewer
-        isOpen={showPdfViewer}
-        onClose={() => {
-          setShowPdfViewer(false)
-          setSelectedPdf(null)
-        }}
-        pdfId={selectedPdf?.id}
-        pdfTitle={selectedPdf?.title}
-        onDelete={handleDeletePdf}
-        onEdit={handleRenamePdf}
-      />    </div>
+    </div>
   )
 }

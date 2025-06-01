@@ -44,10 +44,10 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
   const isNotesPage = currentPath.includes('/notes');
   
   const navLinks = [
-    { href: '/pdfs', label: 'PDFs', showOnNotes: false },
+    { href: '/pdfs', label: 'PDFs', showOnNotes: true },
     { href: '/notes', label: 'Notes', showOnNotes: true },
-    { href: '/analytics', label: 'Analytics', showOnNotes: false }, 
-    { href: '/collections', label: 'Collections', showOnNotes: false },
+    { href: '/analytics', label: 'Analytics', showOnNotes: true }, 
+    { href: '/collections', label: 'Collections', showOnNotes: true },
   ];
 
   return (
@@ -178,32 +178,8 @@ export default function Navbar({ isLoggedIn, user, onLoginClick, onSignupClick, 
           </motion.div>
         </div>
 
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {isMenuOpen && (
-            <motion.div
-              className="md:hidden"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="px-2 pt-2 pb-3 space-y-1 bg-[#1a1333] rounded-lg mt-2 border border-[#7b4fff]/20">
-                {navLinks
-                  .filter(link => !isNotesPage || link.showOnNotes)
-                  .map(link => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="block px-3 py-2 text-[#a0a0c0] hover:text-white hover:bg-[#7b4fff]/10 rounded-md transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        
+
       </nav>
     </header>
   );
