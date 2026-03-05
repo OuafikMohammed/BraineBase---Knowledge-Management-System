@@ -2,12 +2,10 @@
 module.exports = {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{js,jsx}",
-    "./components/**/*.{js,jsx}",
-    "./app/**/*.{js,jsx}",
-    "./src/**/*.{js,jsx}",
-    "*.{js,jsx,mdx}",
-    "*.{js,ts,jsx,tsx,mdx}",
+    './pages/**/*.{ts,tsx,js,jsx}',
+    './components/**/*.{ts,tsx,js,jsx}',
+    './app/**/*.{ts,tsx,js,jsx}',
+    './src/**/*.{ts,tsx,js,jsx}',
   ],
   theme: {
     container: {
@@ -19,44 +17,73 @@ module.exports = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: {
+          DEFAULT: "hsl(var(--border))",
+          light: "#e2e8f0"
+        },
+        input: {
+          DEFAULT: "hsl(var(--input))",
+          light: "#f8fafc"
+        },
+        ring: {
+          DEFAULT: "hsl(var(--ring))",
+          light: "#7b4fff"
+        },
+        background: {
+          DEFAULT: "hsl(var(--background))",
+          light: "#ffffff"
+        },
+        foreground: {
+          DEFAULT: "hsl(var(--foreground))",
+          light: "#1a1333"
+        },
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          light: "#f8fafc"
+        },
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#7b4fff",
+          foreground: "#ffffff",
+          hover: "#a67cfc",
+          light: {
+            DEFAULT: "#7b4fff",
+            foreground: "#ffffff",
+            hover: "#6b3ee6"
+          }
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#a0a0c0",
+          foreground: "#ffffff",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "#ff4f4f",
+          foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "#1a1333",
+          foreground: "#a0a0c0",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#7b4fff",
+          foreground: "#ffffff",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "#1a1333",
+          foreground: "#ffffff",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#1a1333",
+          foreground: "#ffffff",
+        },
+        text: {
+          primary: "#ffffff",
+          secondary: "#a0a0c0",
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "0.5rem",
+        md: "calc(0.5rem - 2px)",
+        sm: "calc(0.5rem - 4px)",
       },
       keyframes: {
         "accordion-down": {
@@ -67,19 +94,27 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: 0 },
         },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(20px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        rotate: {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-      },
-      typography: {
-        DEFAULT: {
-          css: {
-            maxWidth: "100%",
-          },
-        },
+        'fadeIn': 'fadeIn 0.5s ease-out',
+        'slideUp': 'slideUp 0.5s ease-out',
+        'rotate': 'rotate 1s ease-in-out',
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [require("tailwindcss-animate")],
 }

@@ -7,111 +7,162 @@ import Footer from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Folder, FileText, Search, Users, Eye, Edit } from "lucide-react"
+import { Folder, FileText, Search, Users, Globe } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
+import { collectionService } from "@/lib/collection-service"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function SharedWithMePage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
-  const [theme, setTheme] = useState("light")
   const [searchQuery, setSearchQuery] = useState("")
   const [sharedCollections, setSharedCollections] = useState([])
   const [filteredCollections, setFilteredCollections] = useState([])
-
-  // Mock shared collections
-  const mockSharedCollections = [
-    {
-      id: 5,
-      name: "Project X Research",
-      description: "Research materials for Project X",
-      count: 8,
-      owner: { id: 2, name: "Jane Smith", avatar: "/placeholder.svg?height=40&width=40", role: "EDITOR" },
-      lastUpdated: "2023-12-01",
-      permission: "READ",
-    },
-    {
-      id: 6,
-      name: "Marketing Assets",
-      description: "Brand assets and marketing materials",
-      count: 12,
-      owner: { id: 3, name: "Robert Johnson", avatar: "/placeholder.svg?height=40&width=40", role: "EDITOR" },
-      lastUpdated: "2023-11-15",
-      permission: "EDIT",
-    },
-    {
-      id: 7,
-      name: "Client Presentations",
-      description: "Presentations for client meetings",
-      count: 5,
-      owner: { id: 4, name: "Emily Davis", avatar: "/placeholder.svg?height=40&width=40", role: "EDITOR" },
-      lastUpdated: "2023-10-20",
-      permission: "READ",
-    },
-    {
-      id: 8,
-      name: "Development Guidelines",
-      description: "Best practices and guidelines for development",
-      count: 9,
-      owner: { id: 5, name: "Michael Wilson", avatar: "/placeholder.svg?height=40&width=40", role: "ADMIN" },
-      lastUpdated: "2023-09-25",
-      permission: "EDIT",
-    },
-  ]
-
-  // Check for saved theme preference and user data
+  const [activeTab, setActiveTab] = useState("all")
+  
+  // Check authentication state and fetch shared collections
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
-    }
-
-    // Check if user is logged in (mock implementation)
-    const mockUser = {
-      id: 1,
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "Editor",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    }
-
-    // In a real app, you would check if the user is logged in
-    const isUserLoggedIn = true // Mock value
-
-    if (isUserLoggedIn) {
-      setUser(mockUser)
+    const token = localStorage.getItem("token")
+    const userId = localStorage.getItem("userId")
+    const userName = localStorage.getItem("userName")
+    const userEmail = localStorage.getItem("userEmail")
+    const userRole = localStorage.getItem("userRole")
+    
+    if (token && userId) {
       setIsLoggedIn(true)
-      setSharedCollections(mockSharedCollections)
-      setFilteredCollections(mockSharedCollections)
+      setUser({
+        id: parseInt(userId),
+        name: userName,
+        email: userEmail,
+        status: userRole || "Viewer",
+        profileType: "Standard",
+        profileImage: "/placeholder.svg?height=40&width=40"
+      })
+      
+      fetchSharedCollections()
+    } else {
+      router.push("/")
     }
-  }, [])
+  }, [router])
 
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
+  // Fetch shared collections
+  const fetchSharedCollections = async () => {
+    try {
+      setIsLoading(true)
+      const collections = await collectionService.getSharedCollections()
+      // Filter out collections that this user shouldn't see
+      const filteredCollections = collections.filter(collection => 
+        collection.visibility === "public" || // Include all public collections
+        (collection.visibility === "shared" && // Include shared collections where user has access
+          collection.sharedWith?.some(share => 
+            typeof share === 'object' 
+              ? share.idProfile === user.id 
+              : share === user.id
+          ))
+      )
+      setSharedCollections(filteredCollections)
+      setFilteredCollections(filteredCollections)
+    } catch (error) {
+      console.error("Error fetching shared collections:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load shared collections",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Handle search
   const handleSearch = (query) => {
     setSearchQuery(query)
     if (query) {
-      const filtered = sharedCollections.filter(
-        (collection) =>
-          collection.name.toLowerCase().includes(query.toLowerCase()) ||
-          collection.description.toLowerCase().includes(query.toLowerCase()) ||
-          collection.owner.name.toLowerCase().includes(query.toLowerCase()),
+      const filtered = sharedCollections.filter(collection =>
+        collection.name.toLowerCase().includes(query.toLowerCase()) ||
+        collection.description?.toLowerCase().includes(query.toLowerCase()) ||
+        collection.creator?.name?.toLowerCase().includes(query.toLowerCase())
       )
       setFilteredCollections(filtered)
     } else {
       setFilteredCollections(sharedCollections)
     }
+  }
+
+  // Filter collections by tab
+  const getTabCollections = () => {
+    switch (activeTab) {
+      case "shared":
+        return filteredCollections.filter(c => c.visibility === "shared")
+      case "public":
+        return filteredCollections.filter(c => c.visibility === "public")
+      default:
+        return filteredCollections
+    }
+  }
+
+  // Render collections grid
+  const renderCollections = () => {
+    const collections = getTabCollections()
+    return collections.length > 0 ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {collections.map((collection) => (
+          <Card key={collection.id} className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <CardTitle className="flex items-start text-base">
+                  <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>{collection.name}</span>
+                </CardTitle>
+              </div>
+              <CardDescription>{collection.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <div className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span>{collection.count} documents</span>
+                </div>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Users className="h-4 w-4 text-blue-500" />
+                  <span>Shared</span>
+                </Badge>
+              </div>
+              <div className="mt-3 flex items-center">
+                <p className="text-xs text-muted-foreground mr-2">Shared by:</p>
+                <div className="flex items-center">
+                  <Avatar className="h-6 w-6 mr-2">
+                    <AvatarImage src={collection.creator.avatar} alt={collection.creator.name} />
+                    <AvatarFallback>{collection.creator.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm">{collection.creator.name}</span>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full" onClick={() => handleViewCollection(collection.id)}>
+                View Collection
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    ) : (
+      <div className="text-center py-12">
+        <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">No Collections Found</h3>
+        <p className="text-muted-foreground">
+          {searchQuery
+            ? "No collections match your search."
+            : `No ${activeTab === "all" ? "" : activeTab} collections are shared with you.`}
+        </p>
+      </div>
+    )
   }
 
   // View collection
@@ -125,105 +176,100 @@ export default function SharedWithMePage() {
     return new Date(dateString).toLocaleDateString(undefined, options)
   }
 
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
         isLoggedIn={isLoggedIn}
         user={user}
-        onLoginClick={() => {}}
-        onSignupClick={() => {}}
-        onLogout={() => {}}
-        theme={theme}
-        toggleTheme={toggleTheme}
+        onLogout={() => {
+          localStorage.removeItem("token")
+          localStorage.removeItem("userId")
+          localStorage.removeItem("userName")
+          localStorage.removeItem("userEmail")
+          localStorage.removeItem("userRole")
+          setIsLoggedIn(false)
+          setUser(null)
+          router.push("/")
+        }}
       />
 
       <div className="flex-grow container mx-auto py-10 px-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Shared With Me</h1>
-            <p className="text-muted-foreground mt-1">Collections shared with you by other users</p>
+            <h1 className="text-3xl font-bold">Shared Collections</h1>
+            <p className="text-muted-foreground mt-1">Collections shared with you</p>
           </div>
         </div>
 
-        <div className="mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search shared collections..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-          </div>
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList>
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              All
+            </TabsTrigger>
+            <TabsTrigger value="shared" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Shared
+            </TabsTrigger>
+            <TabsTrigger value="public" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Public
+            </TabsTrigger>
+          </TabsList>
 
-        {filteredCollections.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCollections.map((collection) => (
-              <Card key={collection.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="flex items-start text-base">
-                      <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-                      <span>{collection.name}</span>
-                    </CardTitle>
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      {collection.permission === "READ" ? (
-                        <>
-                          <Eye className="h-3 w-3 text-blue-500" />
-                          <span>Read Only</span>
-                        </>
-                      ) : (
-                        <>
-                          <Edit className="h-3 w-3 text-green-500" />
-                          <span>Can Edit</span>
-                        </>
-                      )}
-                    </Badge>
-                  </div>
-                  <CardDescription>{collection.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center">
-                      <FileText className="h-4 w-4 mr-2" />
-                      <span>{collection.count} documents</span>
-                    </div>
-                    <span>Updated: {formatDate(collection.lastUpdated)}</span>
-                  </div>
-                  <div className="mt-3 flex items-center">
-                    <p className="text-xs text-muted-foreground mr-2">Shared by:</p>
-                    <div className="flex items-center">
-                      <Avatar className="h-6 w-6 mr-2">
-                        <AvatarImage src={collection.owner.avatar} alt={collection.owner.name} />
-                        <AvatarFallback>{collection.owner.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{collection.owner.name}</span>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button variant="outline" className="w-full" onClick={() => handleViewCollection(collection.id)}>
-                    View Collection
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Shared Collections</h3>
-            <p className="text-muted-foreground">
-              {searchQuery
-                ? "No collections match your search criteria."
-                : "No one has shared any collections with you yet."}
-            </p>
-          </div>
-        )}
+          <TabsContent value="all">
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search collections..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            {renderCollections()}
+          </TabsContent>
+
+          <TabsContent value="shared">
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search shared collections..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            {renderCollections()}
+          </TabsContent>
+
+          <TabsContent value="public">
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search public collections..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            {renderCollections()}
+          </TabsContent>
+        </Tabs>
       </div>
-
       <Footer />
     </div>
   )

@@ -44,22 +44,24 @@ export default function HeroSection() {
 
   return (
     <>
-      <section className="py-12 md:py-20 px-4">
-        <div className="max-w-5xl mx-auto text-center">
+      <section className="py-12 md:py-20 px-4 bg-[#0e0a1a] dark:bg-[#0e0a1a] relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1a1333]/50 via-transparent to-[#7b4fff]/20 pointer-events-none" />
+        <div className="max-w-5xl mx-auto text-center relative z-10">
+      
           <motion.h1
-            className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6"
+            className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
           >
             How can we help you?
           </motion.h1>
 
           <motion.p
-            className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto"
+            className="text-lg md:text-xl text-[#a0a0c0] mb-8 max-w-3xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
           >
             Find support articles, setup guides, troubleshooting, FAQs, and more.
           </motion.p>
@@ -68,18 +70,21 @@ export default function HeroSection() {
             className="mb-12"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
           >
             <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
               <Input
                 type="text"
                 placeholder="Search for articles, guides, and more..."
-                className="pl-10 py-6 text-base rounded-full"
+                className="pl-10 py-6 text-base rounded-full bg-[#1a1333] border-[#7b4fff]/30 text-white placeholder:text-[#a0a0c0] focus:border-[#7b4fff] focus:ring-[#7b4fff]/20"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <Button type="submit" className="absolute right-1 top-1/2 transform -translate-y-1/2 rounded-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#a0a0c0]" />
+              <Button 
+                type="submit" 
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 rounded-full bg-gradient-to-r from-[#7b4fff] to-[#a67cfc] hover:from-[#a67cfc] hover:to-[#7b4fff] transition-all duration-300"
+              >
                 Search
               </Button>
             </form>
@@ -91,7 +96,9 @@ export default function HeroSection() {
                 key={template.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+                transition={{ duration: 0.7, delay: 0.3 + index * 0.1 }}
+                whileHover={{ scale: 1.02 }}
+                className="transform transition-all duration-300"
               >
                 <TemplateCard
                   title={template.title}
@@ -104,7 +111,6 @@ export default function HeroSection() {
           </div>
         </div>
       </section>
-
       <NewsletterSection />
       <Footer />
     </>

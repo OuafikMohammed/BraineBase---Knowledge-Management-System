@@ -1,0 +1,117 @@
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--primary-rgb), 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.hover-scale {
+  transition: transform 0.2s ease-in-out;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-glow {
+  transition: all 0.2s ease-in-out;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 15px var(--primary);
+}
+
+/* Collection and PDF item animations */
+.collection-item, .pdf-item {
+  transition: all 0.3s ease-in-out;
+  @apply hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/20 hover:border-primary;
+}
+
+/* For light mode */
+:root {
+  --primary: #7b4fff;
+  --primary-rgb: 123, 79, 255;
+  --background: #ffffff;
+  --card: #f8f9fa;
+  --card-hover: #ffffff;
+  --text: #1a1a1a;
+  --border: #e2e8f0;
+}
+
+/* For dark mode */
+[data-theme="dark"] {
+  --primary: #7b4fff;
+  --primary-rgb: 123, 79, 255;
+  --background: #0e0a1a;
+  --card: #1a1333;
+  --card-hover: #231947;
+  --text: #ffffff;
+  --border: #2d2d3d;
+}
+
+.sidebar-menu {
+  @apply transition-all duration-200;
+}
+
+.hamburger-icon {
+  @apply relative w-6 h-6 cursor-pointer;
+}
+
+.hamburger-icon span {
+  @apply absolute left-0 h-0.5 bg-current transition-all duration-300;
+  width: 100%;
+}
+
+.hamburger-icon span:first-child {
+  top: 25%;
+}
+
+.hamburger-icon span:nth-child(2) {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.hamburger-icon span:last-child {
+  bottom: 25%;
+}
+
+.hamburger-icon.active span:first-child {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.hamburger-icon.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-icon.active span:last-child {
+  transform: translateY(-8px) rotate(-45deg);
+}

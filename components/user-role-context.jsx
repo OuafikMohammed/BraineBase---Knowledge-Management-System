@@ -18,16 +18,19 @@ const UserRoleContext = createContext({
 
 export function UserRoleProvider({ children }) {
   const [userRole, setUserRole] = useState("VIEWER")
-  const [userId, setUserId] = useState(1) // Mock user ID
+  const [userId, setUserId] = useState(null)
 
-  // Load user role from localStorage or API in a real app
   useEffect(() => {
-    // Mock implementation - in a real app, this would come from authentication
+    // Load user role and id_profile from localStorage
     const savedRole = localStorage.getItem("userRole") || "VIEWER"
+    const savedUserId = localStorage.getItem("userId")
+
     setUserRole(savedRole)
+    if (savedUserId) {
+      setUserId(savedUserId)
+    }
   }, [])
 
-  // Role-based helper functions
   const isAdmin = userRole === "ADMIN"
   const isEditor = userRole === "EDITOR"
   const isViewer = userRole === "VIEWER"
@@ -37,10 +40,12 @@ export function UserRoleProvider({ children }) {
 
   const canEditCollection = (collection) => {
     if (isAdmin) return true
-    if (isEditor && collection.owner?.id === userId) return true
+    if (isEditor && collection.created_by === userId) return true
     if (collection.sharedWith) {
       const userShare = collection.sharedWith.find((share) =>
-        typeof share === "object" ? share.userId === userId && share.permission === "EDIT" : share === userId,
+        typeof share === "object"
+          ? share.id_profile === userId && share.permission === "EDIT"
+          : share === userId
       )
       return !!userShare
     }
@@ -49,19 +54,19 @@ export function UserRoleProvider({ children }) {
 
   const canDeleteCollection = (collection) => {
     if (isAdmin) return true
-    if (isEditor && collection.owner?.id === userId) return true
+    if (isEditor && collection.created_by === userId) return true
     return false
   }
 
   const canEditPdf = (pdf) => {
     if (isAdmin) return true
-    if (isEditor && pdf.addedBy === userId) return true
+    if (isEditor && pdf.uploaded_by === userId) return true
     return false
   }
 
   const canDeletePdf = (pdf) => {
     if (isAdmin) return true
-    if (isEditor && pdf.addedBy === userId) return true
+    if (isEditor && pdf.uploaded_by === userId) return true
     return false
   }
 
@@ -82,7 +87,11 @@ export function UserRoleProvider({ children }) {
     canDeletePdf,
   }
 
-  return <UserRoleContext.Provider value={value}>{children}</UserRoleContext.Provider>
+  return (
+    <UserRoleContext.Provider value={value}>
+      {children}
+    </UserRoleContext.Provider>
+  )
 }
 
 export const useUserRole = () => {

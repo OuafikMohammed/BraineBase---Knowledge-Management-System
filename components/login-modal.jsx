@@ -1,123 +1,210 @@
-"use client"
+"use client";
+import api from "@/lib/api";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Check } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import ResetPasswordModal from "./reset-password-modal";
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+export default function LoginModal({ onLogin, onSignupClick }) {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
-export default function LoginModal({ onClose, onLogin, onGoogleLogin, onSignupClick }) {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    setIsLoading(true)
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
+  };
 
-    // Simulate API call
-    setTimeout(() => {
-      onLogin(email, password)
-      setIsLoading(false)
-    }, 1000)
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isLoading) return; // Prevent double submission
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const response = await api.post("/login", formData);
+      // Store the token
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+      }
+      // Store user role and id_profile
+      if (response.data.user) {
+        localStorage.setItem('userRole', response.data.user.user_type || 'VIEWER');
+        if (response.data.user.id_profile) {
+          localStorage.setItem('userId', response.data.user.id_profile);
+        }
+      }
+      
+      setShowSuccess(true);
+      onLogin(response.data);
+      
+      // Wait for animation to complete before closing and reloading
+      setTimeout(() => {
+        setIsOpen(false);
+        setTimeout(() => {
+          window.location.reload();
+        }, 300); // Additional delay for modal close animation
+      }, 1500);
+    } catch (error) {
+      setErrors({
+        general: error.response?.data?.message || "Invalid credentials. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.2 }}
-          className="bg-white rounded-lg shadow-lg w-full max-w-md overflow-hidden"
-        >
-          <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="text-xl font-bold">Log in to BrainBase</h2>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </div>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="text-white hover:text-white hover:bg-[#7b4fff]/20 transition-colors">
+          Login
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px] bg-[#1a1333]/95 backdrop-blur-lg border-[#7b4fff]/20">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-white">Welcome Back</DialogTitle>
+          <DialogDescription className="text-[#a0a0c0]">
+            Enter your credentials to login
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <AnimatePresence mode="wait">
+          {showSuccess ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex flex-col items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="rounded-full bg-green-500/20 p-3 mb-4"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                >
+                  <Check className="h-6 w-6 text-green-500" />
+                </motion.div>
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="text-white text-lg font-semibold"
+              >
+                Logged in successfully!
+              </motion.p>
+            </motion.div>
+          ) : (
+            <motion.form
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onSubmit={handleSubmit}
+              className="space-y-4 mt-4"
+            >
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-[#a0a0c0]">
+                  Email
+                </Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  placeholder="your@email.com"
+                  className={`bg-[#0e0a1a]/50 border-[#7b4fff]/30 text-white ${
+                    errors.email ? "border-red-500" : ""
+                  }`}
+                  value={formData.email}
+                  onChange={handleChange}
+                  autoComplete="email"
                 />
+                {errors.email && <p className="text-red-500 text-sm">{errors.email[0]}</p>}
               </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <a href="#" className="text-sm text-gray-600 hover:underline">
-                    Forgot password?
-                  </a>
+              <div className="space-y-2">                <div className="flex justify-between items-center">
+                  <Label htmlFor="password" className="text-[#a0a0c0]">
+                    Password
+                  </Label>
+                  <ResetPasswordModal />
                 </div>
                 <Input
                   id="password"
+                  name="password"
                   type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  placeholder="Your password"
+                  className={`bg-[#0e0a1a]/50 border-[#7b4fff]/30 text-white ${
+                    errors.password ? "border-red-500" : ""
+                  }`}
+                  value={formData.password}
+                  onChange={handleChange}
+                  autoComplete="current-password"
                 />
+                {errors.password && <p className="text-red-500 text-sm">{errors.password[0]}</p>}
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Log in"}
+              {errors.general && (
+                <p className="text-red-500 text-sm text-center">{errors.general}</p>
+              )}
+
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-[#7b4fff] to-[#a67cfc] text-white mt-4"
+              >
+                {isLoading ? "Logging in..." : "Login"}
               </Button>
-            </form>
 
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+              <div className="mt-4 text-center">
+                <p className="text-[#a0a0c0]">
+                  Don't have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onSignupClick();
+                    }}
+                    className="text-[#7b4fff] hover:text-[#a67cfc] transition-colors"
+                  >
+                    Sign Up
+                  </button>
+                </p>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <Button variant="outline" className="w-full" onClick={onGoogleLogin}>
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-                <path d="M1 1h22v22H1z" fill="none" />
-              </svg>
-              Continue with Google
-            </Button>
-
-            <div className="mt-6 text-center text-sm">
-              <span className="text-gray-600">Don't have an account?</span>{" "}
-              <button className="font-medium text-black hover:underline" onClick={onSignupClick}>
-                Sign up
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
-  )
+            </motion.form>
+          )}
+        </AnimatePresence>
+      </DialogContent>
+    </Dialog>
+  );
 }

@@ -2,37 +2,24 @@
 
 import { useState, useEffect } from "react"
 import Navbar from "@/components/navbar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Label } from "@/components/ui/label"
+import Footer from "@/components/footer"
+import { useRouter } from "next/navigation"
+import { useUserRole } from "@/components/user-role-context"
+import PdfUploader from "../../components/pdfs/pdf-uploader"
+import PdfViewer from "../../components/pdfs/pdf-viewer"
 import {
-  Search,
-  FileText,
-  Download,
-  Eye,
-  Upload,
-  Plus,
-  Filter,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Bookmark,
-  Folder,
-} from "lucide-react"
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
-  DropdownMenuSubContent,
-} from "@/components/ui/dropdown-menu"
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -51,88 +38,48 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import Footer from "@/components/footer"
-import { useRouter } from "next/navigation"
-
-// Import and use the UserRole context
-import { useUserRole } from "@/components/user-role-context"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { toast } from "@/components/ui/use-toast"
+import { 
+  Search, 
+  FileText, 
+  Download, 
+  Eye, 
+  Upload, 
+  Plus, 
+  Filter, 
+  MoreHorizontal, 
+  Edit, 
+  Trash2, 
+  Bookmark, 
+  Folder 
+} from "lucide-react"
+import { pdfService } from "@/lib/pdf-service"
+import { collectionService } from "@/lib/collection-service"
 
 export default function PDFsPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser] = useState(null)
-  const [theme, setTheme] = useState("light")
+  const [pdfs, setPdfs] = useState([])
+  const [collections, setCollections] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
-  const router = useRouter()
-
-  // Add this near the top of the component
-  const { role, isAdmin, isEditor, canEditPdf, canDeletePdf } = useUserRole()
-
-  // Mock PDF data
-  const [pdfs, setPdfs] = useState([
-    {
-      id: 1,
-      title: "Knowledge Base Setup Guide",
-      description: "A comprehensive guide to setting up your knowledge base",
-      date: "2023-12-15",
-      size: "2.4 MB",
-      category: "Guides",
-      addedBy: "user123",
-    },
-    {
-      id: 2,
-      title: "Content Organization Best Practices",
-      description: "Learn how to organize your content effectively",
-      date: "2023-11-20",
-      size: "1.8 MB",
-      category: "Best Practices",
-      addedBy: "user456",
-    },
-    {
-      id: 3,
-      title: "User Management Manual",
-      description: "How to manage users and permissions in your knowledge base",
-      date: "2023-10-05",
-      size: "3.2 MB",
-      category: "Manuals",
-      addedBy: "user123",
-    },
-    {
-      id: 4,
-      title: "API Documentation",
-      description: "Technical documentation for the BrainBase API",
-      date: "2023-09-12",
-      size: "5.1 MB",
-      category: "Technical",
-      addedBy: "user789",
-    },
-    {
-      id: 5,
-      title: "Content Migration Guide",
-      description: "How to migrate content from other platforms to BrainBase",
-      date: "2023-08-30",
-      size: "1.5 MB",
-      category: "Guides",
-      addedBy: "user456",
-    },
-    {
-      id: 6,
-      title: "Analytics and Reporting",
-      description: "Understanding BrainBase analytics and reporting features",
-      date: "2023-07-22",
-      size: "2.7 MB",
-      category: "Features",
-      addedBy: "user789",
-    },
-  ])
-
-  // Add these state variables
-  const [collections, setCollections] = useState([
-    { id: 1, name: "Favorites" },
-    { id: 2, name: "Work Documents" },
-    { id: 3, name: "Personal" },
-  ])
   const [collectionSearchQuery, setCollectionSearchQuery] = useState("")
+  
+  // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [pdfToDelete, setPdfToDelete] = useState(null)
   const [showModifyDialog, setShowModifyDialog] = useState(false)
@@ -141,98 +88,111 @@ export default function PDFsPage() {
   const [showCreateCollectionDialog, setShowCreateCollectionDialog] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState("")
   const [pdfToAddToCollection, setPdfToAddToCollection] = useState(null)
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
 
-  // Get unique categories
-  const categories = ["all", ...new Set(pdfs.map((pdf) => pdf.category))]
+  const [showPdfViewer, setShowPdfViewer] = useState(false)
+  const [selectedPdf, setSelectedPdf] = useState(null)
+
+  const router = useRouter()
+  const { isAdmin, isEditor } = useUserRole()
+
+  // Get unique categories from PDFs
+  const categories = ["all", ...new Set(pdfs.map((pdf) => pdf.category || "Uncategorized"))]
 
   // Filtered PDFs based on search and category
   const filteredPDFs = pdfs.filter(
     (pdf) =>
-      (activeCategory === "all" || pdf.category === activeCategory) &&
-      (pdf.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pdf.description.toLowerCase().includes(searchQuery.toLowerCase())),
+      (activeCategory === "all" || pdf.category === activeCategory || 
+       (activeCategory === "Uncategorized" && !pdf.category)) &&
+      (pdf.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       pdf.description?.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  // Check for saved theme preference and user data
+
+  // Fetch PDFs and collections on component mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const token = localStorage.getItem("token")
+        if (!token) {
+          router.push("/")
+          return
+        }
+
+        const data = await pdfService.getAllPdfs()
+        setPdfs(data)
+
+        const collectionsData = await collectionService.getAllCollections()
+        setCollections(collectionsData)
+
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load PDFs and collections",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    // Check if user is logged in (mock implementation)
-    const mockUser = {
-      id: "user123",
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "Editor",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    }
+    fetchData()
+  }, [router])
 
-    // In a real app, you would check if the user is logged in
-    const isUserLoggedIn = true // Mock value
-
-    if (isUserLoggedIn) {
-      setUser(mockUser)
-      setIsLoggedIn(true)
-    }
-  }, [])
-
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-  }
-
-  // Mock download function
-  const handleDownload = (pdfId) => {
-    const pdf = pdfs.find((p) => p.id === pdfId)
-    alert(`Downloading: ${pdf.title}`)
-  }
-
-  // Mock view function
-  const handleView = (pdfId) => {
-    const pdf = pdfs.find((p) => p.id === pdfId)
-    alert(`Viewing: ${pdf.title}`)
-  }
-
-  // Mock upload function
-  const handleUpload = () => {
-    alert("Upload functionality would be implemented here")
-  }
-
-  // Add these handler functions
+  // Handler functions for CRUD operations
   const handleDeletePdf = (pdfId) => {
     setPdfToDelete(pdfId)
     setShowDeleteDialog(true)
   }
 
-  const confirmDeletePdf = () => {
-    // Filter out the deleted PDF
-    const updatedPdfs = pdfs.filter((pdf) => pdf.id !== pdfToDelete)
-    setPdfs(updatedPdfs)
-    setShowDeleteDialog(false)
-    setPdfToDelete(null)
+  const confirmDeletePdf = async () => {
+    try {
+      await pdfService.deletePdf(pdfToDelete)
+      setPdfs(prev => prev.filter(pdf => pdf.id !== pdfToDelete))
+      toast({ description: "PDF deleted successfully" })
+    } catch (error) {
+      console.error("Error deleting PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete PDF",
+        variant: "destructive"
+      })
+    } finally {
+      setShowDeleteDialog(false)
+      setPdfToDelete(null)
+    }
   }
 
   const handleModifyPdf = (pdfId) => {
-    const pdf = pdfs.find((p) => p.id === pdfId)
+    const pdf = pdfs.find(p => p.id === pdfId)
     setPdfToModify(pdfId)
     setNewPdfName(pdf.title)
     setShowModifyDialog(true)
   }
 
-  const confirmModifyPdf = () => {
-    // Update the PDF name
-    const updatedPdfs = pdfs.map((pdf) => (pdf.id === pdfToModify ? { ...pdf, title: newPdfName } : pdf))
-    setPdfs(updatedPdfs)
-    setShowModifyDialog(false)
-    setPdfToModify(null)
+  const confirmModifyPdf = async () => {
+    try {
+      await pdfService.updatePdf(pdfToModify, { title: newPdfName })
+      setPdfs(prev => prev.map(pdf => 
+        pdf.id === pdfToModify 
+          ? { ...pdf, title: newPdfName }
+          : pdf
+      ))
+      toast({ description: "PDF updated successfully" })
+    } catch (error) {
+      console.error("Error updating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update PDF",
+        variant: "destructive"
+      })
+    } finally {
+      setShowModifyDialog(false)
+      setPdfToModify(null)
+      setNewPdfName("")
+    }
   }
 
   const handleCreateCollection = (pdfId) => {
@@ -240,37 +200,134 @@ export default function PDFsPage() {
     setShowCreateCollectionDialog(true)
   }
 
-  const confirmCreateCollection = () => {
-    // Create new collection
-    const newCollection = {
-      id: Math.max(...collections.map((c) => c.id)) + 1,
-      name: newCollectionName,
+  const confirmCreateCollection = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/collections", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newCollectionName,
+          visibility: "private"
+        })
+      })
+
+      if (response.ok) {
+        const newCollection = await response.json()
+        setCollections([...collections, newCollection])
+        toast({ description: "Collection created successfully" })
+
+        // Add PDF to the new collection
+        if (pdfToAddToCollection) {
+          await handleSaveToCollection(pdfToAddToCollection, newCollection.id)
+        }
+      }
+
+    } catch (error) {
+      console.error("Error creating collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create collection",
+        variant: "destructive"
+      })
+    } finally {
+      setShowCreateCollectionDialog(false)
+      setNewCollectionName("")
+      setPdfToAddToCollection(null)
     }
-    setCollections([...collections, newCollection])
-
-    // Save PDF to this collection (in a real app, you'd have a many-to-many relationship)
-    alert(`PDF saved to new collection: ${newCollectionName}`)
-
-    setShowCreateCollectionDialog(false)
-    setNewCollectionName("")
-    setPdfToAddToCollection(null)
   }
 
-  const handleSaveToCollection = (pdfId, collectionId) => {
-    const collection = collections.find((c) => c.id === collectionId)
-    alert(`PDF saved to collection: ${collection.name}`)
+  const handleSaveToCollection = async (pdfId, collectionId) => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`/api/collections/${collectionId}/pdfs/${pdfId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        toast({ description: "PDF added to collection successfully" })
+      }
+
+    } catch (error) {
+      console.error("Error adding PDF to collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add PDF to collection",
+        variant: "destructive"
+      })
+    }
   }
+  const handleViewPdf = (pdf) => {
+    setSelectedPdf(pdf)
+    setShowPdfViewer(true)
+  }
+
+  const handleDownloadPdf = async (pdfId) => {
+    try {
+      const blob = await pdfService.downloadPdf(pdfId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const pdf = pdfs.find(p => p.id === pdfId)
+      a.download = pdf?.title ? `${pdf.title}.pdf` : `document-${pdfId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast({
+        description: "PDF downloaded successfully"
+      })
+    } catch (error) {
+      console.error('Error downloading PDF:', error)
+      toast({
+        title: "Error",
+        description: "Failed to download PDF",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // State for upload form
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadTitle, setUploadTitle] = useState('')
+  const [uploadDescription, setUploadDescription] = useState('')
+  const [uploadCategory, setUploadCategory] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+
+  const handleAddToCollection = async (pdfId, collectionId) => {
+    try {
+      await collectionService.addPdfToCollection(collectionId, pdfId);
+      toast({ description: "PDF added to collection successfully" });
+    } catch (error) {
+      console.error("Error adding PDF to collection:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add PDF to collection",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar
-        isLoggedIn={isLoggedIn}
-        user={user}
+        isLoggedIn={true}
+        user={null}
         onLoginClick={() => {}}
         onSignupClick={() => {}}
-        onLogout={() => {}}
-        theme={theme}
-        toggleTheme={toggleTheme}
+        onLogout={() => {
+          localStorage.removeItem("token")
+          localStorage.removeItem("user")
+          router.push("/")
+        }}
+        theme="light"
+        toggleTheme={() => {}}
       />
 
       <div className="flex-grow container mx-auto py-10 px-4">
@@ -279,26 +336,23 @@ export default function PDFsPage() {
             <h1 className="text-3xl font-bold">PDF Documents</h1>
             <p className="text-muted-foreground mt-1">Manage and access your PDF documents</p>
           </div>
-
-          {/* Update the upload button to be conditionally rendered based on role */}
           <div className="flex gap-2">
-            {(isAdmin || isEditor) && (
-              <Button onClick={handleUpload} className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Upload PDF
-              </Button>
-            )}
-            {(isAdmin || isEditor) && (
-              <Button variant="outline" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Create Collection
-              </Button>
-            )}
+            <Button onClick={() => setShowUploadDialog(true)} className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Upload PDF
+            </Button>
+            <Button 
+              onClick={() => setShowCreateCollectionDialog(true)} 
+              variant="outline" 
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Create Collection
+            </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-20">
               <div className="space-y-4">
@@ -324,7 +378,9 @@ export default function PDFsPage() {
                         key={category}
                         onClick={() => setActiveCategory(category)}
                         className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                          activeCategory === category ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                          activeCategory === category 
+                            ? "bg-primary text-primary-foreground" 
+                            : "hover:bg-muted"
                         }`}
                       >
                         {category === "all" ? "All Documents" : category}
@@ -354,11 +410,12 @@ export default function PDFsPage() {
             </div>
           </div>
 
-          {/* Main content */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="grid" className="w-full">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">{activeCategory === "all" ? "All Documents" : activeCategory}</h2>
+                <h2 className="text-xl font-semibold">
+                  {activeCategory === "all" ? "All Documents" : activeCategory === "Uncategorized" ? "Uncategorized" : activeCategory}
+                </h2>
                 <TabsList>
                   <TabsTrigger value="grid">Grid</TabsTrigger>
                   <TabsTrigger value="list">List</TabsTrigger>
@@ -379,92 +436,91 @@ export default function PDFsPage() {
                         <CardContent>
                           <p className="text-sm text-muted-foreground mb-4">{pdf.description}</p>
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Category: {pdf.category}</span>
-                            <span>Size: {pdf.size}</span>
+                            <span>Category: {pdf.category || "Uncategorized"}</span>
+                            <span>Size: {(pdf.size / 1024).toFixed(2)} KB</span>
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            <span>Added: {pdf.date}</span>
+                            <span>Added: {new Date(pdf.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewPdf(pdf)}
+                                className="flex items-center gap-2"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadPdf(pdf.id)}
+                                className="flex items-center gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                Download
+                              </Button>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {collections.length > 0 && (
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                      <Folder className="h-4 w-4 mr-2" />
+                                      Add to Collection
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                      <DropdownMenuSubContent>
+                                        {collections.map((collection) => (
+                                          <DropdownMenuItem
+                                            key={collection.id}
+                                            onClick={() => handleAddToCollection(pdf.id, collection.id)}
+                                          >
+                                            <Bookmark className="h-4 w-4 mr-2" />
+                                            {collection.name}
+                                          </DropdownMenuItem>
+                                        ))}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleCreateCollection(pdf.id)}>
+                                          <Plus className="h-4 w-4 mr-2" />
+                                          Create New Collection
+                                        </DropdownMenuItem>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                  </DropdownMenuSub>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeletePdf(pdf.id)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleView(pdf.id)}
-                            className="flex items-center"
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            {/* Update the PDF actions based on user role */}
-                            <DropdownMenuContent align="end">
-                              {(isAdmin || (isEditor && pdf.addedBy === user?.id)) && (
-                                <>
-                                  <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Modify
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDeletePdf(pdf.id)}>
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                  <Bookmark className="h-4 w-4 mr-2" />
-                                  Save to
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuPortal>
-                                  <DropdownMenuSubContent className="w-56">
-                                    <div className="p-2">
-                                      <Input
-                                        placeholder="Search collections..."
-                                        className="mb-2"
-                                        onChange={(e) => setCollectionSearchQuery(e.target.value)}
-                                      />
-                                    </div>
-                                    {(isAdmin || isEditor) && (
-                                      <DropdownMenuItem onClick={() => handleCreateCollection(pdf.id)}>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Create new collection
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuLabel>My Collections</DropdownMenuLabel>
-                                    {collections.map((collection) => (
-                                      <DropdownMenuItem
-                                        key={collection.id}
-                                        onClick={() => handleSaveToCollection(pdf.id, collection.id)}
-                                      >
-                                        <Folder className="h-4 w-4 mr-2" />
-                                        {collection.name}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuPortal>
-                              </DropdownMenuSub>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleDownload(pdf.id)}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </CardFooter>
                       </Card>
                     ))
                   ) : (
                     <div className="col-span-full text-center py-12">
                       <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="text-lg font-medium mb-2">No PDFs Found</h3>
-                      <p className="text-muted-foreground">We couldn't find any PDFs matching your search criteria.</p>
+                      <p className="text-muted-foreground">
+                        We couldn't find any PDFs matching your search criteria.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -478,7 +534,7 @@ export default function PDFsPage() {
                     <div className="col-span-2">Size</div>
                     <div className="col-span-2">Actions</div>
                   </div>
-
+                  
                   {filteredPDFs.length > 0 ? (
                     filteredPDFs.map((pdf) => (
                       <div key={pdf.id} className="grid grid-cols-12 gap-4 p-4 border-b hover:bg-muted/50">
@@ -487,23 +543,74 @@ export default function PDFsPage() {
                             <FileText className="h-5 w-5 mr-2 text-muted-foreground" />
                             <div>
                               <p className="font-medium">{pdf.title}</p>
-                              <p className="text-xs text-muted-foreground">Added: {pdf.date}</p>
+                              <p className="text-xs text-muted-foreground">Added: {new Date(pdf.created_at).toLocaleDateString()}</p>
                             </div>
                           </div>
                         </div>
                         <div className="col-span-2 flex items-center">
-                          <span className="text-sm">{pdf.category}</span>
+                          <span className="text-sm">{pdf.category || "Uncategorized"}</span>
                         </div>
                         <div className="col-span-2 flex items-center">
-                          <span className="text-sm">{pdf.size}</span>
+                          <span className="text-sm">{(pdf.size / 1024).toFixed(2)} KB</span>
                         </div>
                         <div className="col-span-2 flex items-center space-x-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleView(pdf.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleViewPdf(pdf)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDownload(pdf.id)}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDownloadPdf(pdf.id)}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {collections.length > 0 && (
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <Folder className="h-4 w-4 mr-2" />
+                                    Add to Collection
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuPortal>
+                                    <DropdownMenuSubContent>
+                                      {collections.map((collection) => (
+                                        <DropdownMenuItem
+                                          key={collection.id}
+                                          onClick={() => handleAddToCollection(pdf.id, collection.id)}
+                                        >
+                                          <Bookmark className="h-4 w-4 mr-2" />
+                                          {collection.name}
+                                        </DropdownMenuItem>
+                                      ))}
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => handleCreateCollection(pdf.id)}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Create New Collection
+                                      </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleModifyPdf(pdf.id)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeletePdf(pdf.id)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     ))
@@ -523,7 +630,7 @@ export default function PDFsPage() {
 
       <Footer />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Dialogs */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -534,24 +641,32 @@ export default function PDFsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeletePdf} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction 
+              onClick={confirmDeletePdf} 
+              className="bg-destructive text-destructive-foreground"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modify PDF Dialog */}
       <Dialog open={showModifyDialog} onOpenChange={setShowModifyDialog}>
         <DialogContent aria-describedby="pdf-rename-description">
           <DialogHeader>
             <DialogTitle>Rename PDF</DialogTitle>
-            <DialogDescription id="pdf-rename-description">Enter a new name for your PDF document.</DialogDescription>
+            <DialogDescription id="pdf-rename-description">
+              Enter a new name for your PDF document.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="pdf-name">PDF Name</Label>
-              <Input id="pdf-name" value={newPdfName} onChange={(e) => setNewPdfName(e.target.value)} />
+              <Input 
+                id="pdf-name" 
+                value={newPdfName} 
+                onChange={(e) => setNewPdfName(e.target.value)} 
+              />
             </div>
           </div>
           <DialogFooter>
@@ -563,7 +678,6 @@ export default function PDFsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Collection Dialog */}
       <Dialog open={showCreateCollectionDialog} onOpenChange={setShowCreateCollectionDialog}>
         <DialogContent aria-describedby="collection-create-description">
           <DialogHeader>
@@ -575,10 +689,10 @@ export default function PDFsPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="collection-name">Collection Name</Label>
-              <Input
-                id="collection-name"
-                value={newCollectionName}
-                onChange={(e) => setNewCollectionName(e.target.value)}
+              <Input 
+                id="collection-name" 
+                value={newCollectionName} 
+                onChange={(e) => setNewCollectionName(e.target.value)} 
               />
             </div>
           </div>
@@ -590,6 +704,45 @@ export default function PDFsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Upload PDF</DialogTitle>
+            <DialogDescription>
+              Upload a PDF document to your library.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <PdfUploader 
+            onSuccess={(newPdf) => {
+              setPdfs(prev => [newPdf, ...prev])
+              setShowUploadDialog(false)
+              toast({ description: "PDF uploaded successfully" })
+            }}
+          />
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowUploadDialog(false)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>      <PdfViewer
+        isOpen={showPdfViewer}
+        onClose={() => {
+          setShowPdfViewer(false)
+          setSelectedPdf(null)
+        }}
+        pdfId={selectedPdf?.id}
+        pdfTitle={selectedPdf?.title}
+        onDelete={handleDeletePdf}
+        onEdit={(pdfId) => handleModifyPdf(pdfId)}
+      />
     </div>
   )
 }

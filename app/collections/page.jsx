@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
@@ -28,8 +28,6 @@ import {
   Lock,
   Users,
   Share2,
-  Check,
-  X,
   Eye,
 } from "lucide-react"
 import {
@@ -47,218 +45,228 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-// Import and use the UserRole context
+import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/components/user-role-context"
+import { collectionService } from "../../lib/collection-service"
 
 export default function CollectionsPage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const { role } = useUserRole()
+
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
-  const [theme, setTheme] = useState("light")
-  // Update the collections state to include user roles and proper sharing structure
-  const [collections, setCollections] = useState([
-    {
-      id: 1,
-      name: "Favorites",
-      description: "Your favorite PDFs",
-      count: 5,
-      visibility: "private",
-      sharedWith: [],
-      owner: { id: 1, name: "John Doe", role: "ADMIN" },
-    },
-    {
-      id: 2,
-      name: "Work Documents",
-      description: "Work-related documents",
-      count: 3,
-      visibility: "shared",
-      sharedWith: [
-        { userId: 2, permission: "READ" },
-        { userId: 3, permission: "EDIT" },
-      ],
-      owner: { id: 1, name: "John Doe", role: "ADMIN" },
-    },
-    {
-      id: 3,
-      name: "Personal",
-      description: "Personal documents and files",
-      count: 2,
-      visibility: "private",
-      sharedWith: [],
-      owner: { id: 1, name: "John Doe", role: "ADMIN" },
-    },
-    {
-      id: 4,
-      name: "Public Resources",
-      description: "Publicly available resources",
-      count: 7,
-      visibility: "public",
-      sharedWith: [],
-      owner: { id: 1, name: "John Doe", role: "ADMIN" },
-    },
-  ])
+  const [userId, setUserId] = useState(null)
+
+  const [collections, setCollections] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState("")
   const [newCollectionDescription, setNewCollectionDescription] = useState("")
   const [newCollectionVisibility, setNewCollectionVisibility] = useState("private")
+
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [collectionToEdit, setCollectionToEdit] = useState(null)
-  const [editName, setEditName] = useState("")
-  const [editDescription, setEditDescription] = useState("")
-  const [editVisibility, setEditVisibility] = useState("private")
-  const [filteredCollections, setFilteredCollections] = useState([])
+  const [editingCollection, setEditingCollection] = useState(null)
+
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [collectionToShare, setCollectionToShare] = useState(null)
-  const [searchUserQuery, setSearchUserQuery] = useState("")
   const [selectedUsers, setSelectedUsers] = useState([])
-  const [activeTab, setActiveTab] = useState("my-collections")
   const [sharePermission, setSharePermission] = useState("READ")
 
-  // Mock users data
-  const mockUsers = [
-    { id: 2, name: "Jane Smith", email: "jane.smith@example.com", avatar: "/placeholder.svg?height=40&width=40" },
-    {
-      id: 3,
-      name: "Robert Johnson",
-      email: "robert.johnson@example.com",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    { id: 4, name: "Emily Davis", email: "emily.davis@example.com", avatar: "/placeholder.svg?height=40&width=40" },
-    {
-      id: 5,
-      name: "Michael Wilson",
-      email: "michael.wilson@example.com",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-  ]
-
-  // Mock shared collections
-  const sharedWithMeCollections = [
-    {
-      id: 5,
-      name: "Project X Research",
-      description: "Research materials for Project X",
-      count: 8,
-      owner: { id: 2, name: "Jane Smith", avatar: "/placeholder.svg?height=40&width=40" },
-    },
-    {
-      id: 6,
-      name: "Marketing Assets",
-      description: "Brand assets and marketing materials",
-      count: 12,
-      owner: { id: 3, name: "Robert Johnson", avatar: "/placeholder.svg?height=40&width=40" },
-    },
-  ]
-
-  // Add this near the top of the component
-  const { role, isAdmin, isEditor, canCreateCollection } = useUserRole()
-
-  // Check for saved theme preference and user data
+  // Load user info from localStorage (client-only)
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token")
+      const userId = localStorage.getItem("userId")
+      const userName = localStorage.getItem("userName")
+      const userEmail = localStorage.getItem("userEmail")
+      const userRole = localStorage.getItem("userRole")
+
+      if (token && userId) {
+        setIsLoggedIn(true)
+        setUser({
+          id: parseInt(userId),
+          name: userName,
+          email: userEmail,
+          status: userRole || "Viewer",
+          profileType: "Standard",
+          profileImage: "/placeholder.svg?height=40&width=40"
+        })
+        setUserId(userId)
+      } else {
+        router.push("/")
+      }
     }
+  }, [router])
 
-    // Check if user is logged in (mock implementation)
-    // Update the mock user data to include roles
-    const mockUser = {
-      id: 1,
-      name: "John",
-      surname: "Doe",
-      email: "john.doe@example.com",
-      status: "ADMIN",
-      profileType: "Standard",
-      profileImage: "/placeholder.svg?height=40&width=40",
-    }
-
-    // In a real app, you would check if the user is logged in
-    const isUserLoggedIn = true // Mock value
-
-    if (isUserLoggedIn) {
-      setUser(mockUser)
-      setIsLoggedIn(true)
-    }
-
-    // Initialize filteredCollections with all collections
-    setFilteredCollections(collections)
-  }, [])
-
-  // Update filtered collections when collections change
+  // Load collections
   useEffect(() => {
-    setFilteredCollections(collections)
-  }, [collections])
+    const fetchCollections = async () => {
+      try {
+        console.log('Fetching collections...');
+        setIsLoading(true);
+        
+        // Check if user is authenticated
+        const token = localStorage.getItem('token');
+        const currentUserId = localStorage.getItem('userId');
+        console.log('Auth state:', { 
+          hasToken: !!token, 
+          hasUserId: !!currentUserId 
+        });
 
-  // Theme toggle function
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-  }
+        if (!token || !currentUserId) {
+          console.log('No authentication data found, redirecting to login');
+          router.push('/');
+          return;
+        }
+
+        const data = await collectionService.getAllCollections();
+        console.log('Collections fetched:', {
+          count: data?.length ?? 0,
+          hasData: !!data
+        });
+        
+        setCollections(data);
+      } catch (error) {
+        console.error("Error fetching collections:", {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          stack: error.stack
+        });
+        
+        // Check if error is auth-related
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error, redirecting to login');
+          router.push('/');
+          return;
+        }
+
+        toast({
+          title: "Error",
+          description: error.response?.data?.message || "Failed to load collections",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCollections();
+  }, [router, toast])
+
+  // Filter only collections owned by the current user or shared with them
+  const filteredCollections = useMemo(() => {
+    if (!collections || !Array.isArray(collections)) return []
+    if (!userId) return []
+
+    return collections.filter((collection) => {
+      if (!collection) return false
+
+      const name = collection.name ?? ''
+      const description = collection.description ?? ''
+
+      // Search filter
+      const matchesSearch =
+        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        description.toLowerCase().includes(searchQuery.toLowerCase())
+
+      // Access check based on visibility
+      const hasAccess = 
+        collection.created_by === userId || // User is owner
+        collection.visibility === "public" || // Collection is public
+        (collection.visibility === "shared" && collection.sharedWith?.some(share => 
+          typeof share === 'object' 
+            ? share.idProfile === userId 
+            : share === userId
+        )) // Collection is shared with user
+
+      return matchesSearch && hasAccess
+    })
+  }, [collections, searchQuery, userId])
 
   // Create new collection
-  const handleCreateCollection = () => {
-    if (!newCollectionName.trim()) {
-      alert("Please enter a name for your collection")
-      return
-    }
+  const handleCreateCollection = async () => {
+    try {
+      const newCollection = await collectionService.createCollection({
+        name: newCollectionName,
+        description: newCollectionDescription,
+        visibility: newCollectionVisibility,
+      })
 
-    const newCollection = {
-      id: Math.max(...collections.map((c) => c.id)) + 1,
-      name: newCollectionName,
-      description: newCollectionDescription || "No description",
-      count: 0,
-      visibility: newCollectionVisibility,
-      sharedWith: [],
-    }
+      setCollections((prev) => [...prev, newCollection])
+      setShowCreateDialog(false)
+      setNewCollectionName("")
+      setNewCollectionDescription("")
+      setNewCollectionVisibility("private")
 
-    setCollections([...collections, newCollection])
-    setNewCollectionName("")
-    setNewCollectionDescription("")
-    setNewCollectionVisibility("private")
-    setShowCreateDialog(false)
+      toast({ description: "Collection created successfully" })
+    } catch (error) {
+      console.error("Error creating collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create collection",
+        variant: "destructive",
+      })
+    }
   }
 
   // Edit collection
   const handleEditCollection = (collection) => {
-    setCollectionToEdit(collection)
-    setEditName(collection.name)
-    setEditDescription(collection.description)
-    setEditVisibility(collection.visibility)
+    setEditingCollection(collection)
+    setNewCollectionName(collection.name)
+    setNewCollectionDescription(collection.description)
+    setNewCollectionVisibility(collection.visibility)
     setShowEditDialog(true)
   }
 
-  // Save edited collection
-  const handleSaveEdit = () => {
-    if (!editName.trim()) {
-      alert("Please enter a name for your collection")
-      return
+  const handleSaveEdit = async () => {
+    try {
+      const updatedCollection = await collectionService.updateCollection(editingCollection.id, {
+        name: newCollectionName,
+        description: newCollectionDescription,
+        visibility: newCollectionVisibility,
+      })
+
+      setCollections((prev) =>
+        prev.map((c) =>
+          c.id === editingCollection.id ? updatedCollection : c
+        )
+      )
+
+      setShowEditDialog(false)
+      setEditingCollection(null)
+      toast({ description: "Collection updated successfully" })
+    } catch (error) {
+      console.error("Error updating collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update collection",
+        variant: "destructive",
+      })
     }
-
-    const updatedCollections = collections.map((collection) =>
-      collection.id === collectionToEdit.id
-        ? {
-            ...collection,
-            name: editName,
-            description: editDescription,
-            visibility: editVisibility,
-          }
-        : collection,
-    )
-
-    setCollections(updatedCollections)
-    setShowEditDialog(false)
   }
 
   // Delete collection
-  const handleDeleteCollection = (collectionId) => {
+  const handleDeleteCollection = async (collectionId) => {
     if (!confirm("Are you sure you want to delete this collection?")) return
 
-    const updatedCollections = collections.filter((collection) => collection.id !== collectionId)
-    setCollections(updatedCollections)
+    try {
+      await collectionService.deleteCollection(collectionId)
+      setCollections((prev) =>
+        prev.filter((c) => c.id !== collectionId)
+      )
+      toast({ description: "Collection deleted successfully" })
+    } catch (error) {
+      console.error("Error deleting collection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete collection",
+        variant: "destructive",
+      })
+    }
   }
 
   // View collection
@@ -266,49 +274,7 @@ export default function CollectionsPage() {
     router.push(`/collections/${collectionId}`)
   }
 
-  // Open share dialog
-  const handleShareCollection = (collection) => {
-    setCollectionToShare(collection)
-    setSelectedUsers(collection.sharedWith || [])
-    setShowShareDialog(true)
-  }
-
-  // Save sharing settings
-  const handleSaveSharing = () => {
-    const updatedCollections = collections.map((collection) =>
-      collection.id === collectionToShare.id
-        ? {
-            ...collection,
-            sharedWith: selectedUsers.map((userId) => ({
-              userId,
-              permission: sharePermission,
-            })),
-            visibility: selectedUsers.length > 0 ? "shared" : collection.visibility,
-          }
-        : collection,
-    )
-
-    setCollections(updatedCollections)
-    setShowShareDialog(false)
-  }
-
-  // Toggle user selection for sharing
-  const toggleUserSelection = (userId) => {
-    if (selectedUsers.some((u) => u.userId === userId || u === userId)) {
-      setSelectedUsers(selectedUsers.filter((u) => (typeof u === "object" ? u.userId !== userId : u !== userId)))
-    } else {
-      setSelectedUsers([...selectedUsers, userId])
-    }
-  }
-
-  // Filter users based on search query
-  const filteredUsers = mockUsers.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchUserQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchUserQuery.toLowerCase()),
-  )
-
-  // Get visibility icon
+  // Visibility helpers
   const getVisibilityIcon = (visibility) => {
     switch (visibility) {
       case "public":
@@ -322,17 +288,12 @@ export default function CollectionsPage() {
     }
   }
 
-  // Get visibility label
   const getVisibilityLabel = (visibility) => {
     switch (visibility) {
-      case "public":
-        return "Public"
-      case "private":
-        return "Private"
-      case "shared":
-        return "Shared"
-      default:
-        return "Private"
+      case "public": return "Public"
+      case "private": return "Private"
+      case "shared": return "Shared"
+      default: return "Private"
     }
   }
 
@@ -341,62 +302,147 @@ export default function CollectionsPage() {
       <Navbar
         isLoggedIn={isLoggedIn}
         user={user}
-        onLoginClick={() => {}}
-        onSignupClick={() => {}}
-        onLogout={() => {}}
-        theme={theme}
-        toggleTheme={toggleTheme}
+        onLogout={() => {
+          localStorage.removeItem("token")
+          localStorage.removeItem("userId")
+          localStorage.removeItem("userName")
+          localStorage.removeItem("userEmail")
+          localStorage.removeItem("userRole")
+          setIsLoggedIn(false)
+          setUser(null)
+          router.push("/")
+        }}
       />
 
       <div className="flex-grow container mx-auto py-10 px-4">
-        {/* Update the create collection button to be conditionally rendered based on role */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold">Collections</h1>
             <p className="text-muted-foreground mt-1">Organize your PDFs into collections</p>
           </div>
-
-          {canCreateCollection && (
-            <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create Collection
-            </Button>
-          )}
+          <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" /> Create Collection
+          </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        {/* Main content */}
+        <Tabs defaultValue="all" className="mb-6">
           <TabsList>
-            <TabsTrigger value="my-collections">My Collections</TabsTrigger>
-            <TabsTrigger value="shared-with-me">Shared with Me</TabsTrigger>
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              All
+            </TabsTrigger>
+            <TabsTrigger value="private" className="flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Private
+            </TabsTrigger>
+            <TabsTrigger value="shared" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Shared
+            </TabsTrigger>
+            <TabsTrigger value="public" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Public
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="my-collections">
+          {/* All Collections */}
+          <TabsContent value="all">
             <div className="mb-6">
               <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   type="text"
                   placeholder="Search collections..."
                   className="pl-10"
-                  onChange={(e) => {
-                    const query = e.target.value.toLowerCase()
-                    if (query) {
-                      const filtered = collections.filter(
-                        (collection) =>
-                          collection.name.toLowerCase().includes(query) ||
-                          collection.description.toLowerCase().includes(query),
-                      )
-                      setFilteredCollections(filtered)
-                    } else {
-                      setFilteredCollections(collections)
-                    }
-                  }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
 
+            {isLoading ? (
+              <div className="text-center py-12">Loading collections...</div>
+            ) : filteredCollections.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredCollections.map((collection) => (
+                  <Card key={collection.id} className="overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="flex items-start text-base">
+                          <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                          <span>{collection.name}</span>
+                        </CardTitle>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditCollection(collection)}>
+                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteCollection(collection.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <CardDescription>{collection.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          <span>{collection.pdfs?.length || 0} documents</span>
+                        </div>
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          {getVisibilityIcon(collection.visibility)}
+                          <span>{getVisibilityLabel(collection.visibility)}</span>
+                        </Badge>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleViewCollection(collection.id)}
+                      >
+                        View Collection
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Collections Found</h3>
+                <p className="text-muted-foreground">
+                  {searchQuery
+                    ? "No collections match your search."
+                    : "Create your first collection to get started."}
+                </p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Private Collections */}
+          <TabsContent value="private">
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search private collections..."
+                  className="pl-10"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCollections.map((collection) => (
+              {filteredCollections.filter(c => c.visibility === "private").map((collection) => (
                 <Card key={collection.id} className="overflow-hidden">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
@@ -411,48 +457,11 @@ export default function CollectionsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleShareCollection(collection)}>
-                            <Share2 className="h-4 w-4 mr-2" />
-                            Share
-                          </DropdownMenuItem>
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                              {getVisibilityIcon(collection.visibility)}
-                              <span className="ml-2">Visibility</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              <DropdownMenuRadioGroup
-                                value={collection.visibility}
-                                onValueChange={(value) => {
-                                  const updatedCollections = collections.map((c) =>
-                                    c.id === collection.id ? { ...c, visibility: value } : c,
-                                  )
-                                  setCollections(updatedCollections)
-                                }}
-                              >
-                                <DropdownMenuRadioItem value="private">
-                                  <Lock className="h-4 w-4 mr-2 text-red-500" />
-                                  Private
-                                </DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="shared">
-                                  <Users className="h-4 w-4 mr-2 text-blue-500" />
-                                  Shared
-                                </DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="public">
-                                  <Globe className="h-4 w-4 mr-2 text-green-500" />
-                                  Public
-                                </DropdownMenuRadioItem>
-                              </DropdownMenuRadioGroup>
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-                          <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleEditCollection(collection)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
+                            <Edit className="h-4 w-4 mr-2" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteCollection(collection.id)}>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -463,122 +472,165 @@ export default function CollectionsPage() {
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center">
                         <FileText className="h-4 w-4 mr-2" />
-                        <span>{collection.count} documents</span>
+                        <span>{collection.pdfs?.length || 0} documents</span>
                       </div>
                       <Badge variant="outline" className="flex items-center gap-1">
                         {getVisibilityIcon(collection.visibility)}
                         <span>{getVisibilityLabel(collection.visibility)}</span>
                       </Badge>
                     </div>
-                    {collection.sharedWith && collection.sharedWith.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-xs text-muted-foreground mb-1">Shared with:</p>
-                        <div className="flex -space-x-2 overflow-hidden">
-                          {collection.sharedWith.map((share) => {
-                            const userId = typeof share === "object" ? share.userId : share
-                            const sharedUser = mockUsers.find((u) => u.id === userId)
-                            if (!sharedUser) return null
-                            return (
-                              <div key={userId} className="relative">
-                                <Avatar className="h-6 w-6 border-2 border-background">
-                                  <AvatarImage src={sharedUser.avatar} alt={sharedUser.name} />
-                                  <AvatarFallback>{sharedUser.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                {typeof share === "object" && (
-                                  <span className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
-                                    {share.permission === "READ" ? (
-                                      <Eye className="h-3 w-3 text-blue-500" />
-                                    ) : (
-                                      <Edit className="h-3 w-3 text-green-500" />
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })}
-                          {collection.sharedWith.length > 3 && (
-                            <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-xs">
-                              +{collection.sharedWith.length - 3}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                   <CardFooter>
-                    <Button variant="outline" className="w-full" onClick={() => handleViewCollection(collection.id)}>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleViewCollection(collection.id)}
+                    >
                       View Collection
                     </Button>
                   </CardFooter>
                 </Card>
               ))}
-
-              <Card
-                className="cursor-pointer border-dashed hover:shadow-md transition-shadow flex flex-col items-center justify-center p-6"
-                onClick={() => setShowCreateDialog(true)}
-              >
-                <Plus className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium">Create New Collection</p>
-                <p className="text-sm text-muted-foreground text-center mt-2">
-                  Organize your PDFs into custom collections
-                </p>
-              </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="shared-with-me">
-            {sharedWithMeCollections.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sharedWithMeCollections.map((collection) => (
-                  <Card key={collection.id} className="overflow-hidden">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="flex items-start text-base">
-                          <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-                          <span>{collection.name}</span>
-                        </CardTitle>
-                      </div>
-                      <CardDescription>{collection.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2" />
-                          <span>{collection.count} documents</span>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex items-center">
-                        <p className="text-xs text-muted-foreground mr-2">Shared by:</p>
-                        <div className="flex items-center">
-                          <Avatar className="h-6 w-6 mr-2">
-                            <AvatarImage src={collection.owner.avatar} alt={collection.owner.name} />
-                            <AvatarFallback>{collection.owner.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm">{collection.owner.name}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Button variant="outline" className="w-full" onClick={() => handleViewCollection(collection.id)}>
-                        View Collection
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
+          {/* Shared Collections */}
+          <TabsContent value="shared">
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search shared collections..."
+                  className="pl-10"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-            ) : (
-              <div className="text-center py-12">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Shared Collections</h3>
-                <p className="text-muted-foreground">No one has shared any collections with you yet.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCollections.filter(c => c.visibility === "shared").map((collection) => (
+                <Card key={collection.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="flex items-start text-base">
+                        <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>{collection.name}</span>
+                      </CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditCollection(collection)}>
+                            <Edit className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteCollection(collection.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CardDescription>{collection.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center">
+                        <FileText className="h-4 w-4 mr-2" />
+                        <span>{collection.pdfs?.length || 0} documents</span>
+                      </div>
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        {getVisibilityIcon(collection.visibility)}
+                        <span>{getVisibilityLabel(collection.visibility)}</span>
+                      </Badge>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleViewCollection(collection.id)}
+                    >
+                      View Collection
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Public Collections */}
+          <TabsContent value="public">
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search public collections..."
+                  className="pl-10"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-            )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCollections.filter(c => c.visibility === "public").map((collection) => (
+                <Card key={collection.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="flex items-start text-base">
+                        <Folder className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>{collection.name}</span>
+                      </CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditCollection(collection)}>
+                            <Edit className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteCollection(collection.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CardDescription>{collection.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center">
+                        <FileText className="h-4 w-4 mr-2" />
+                        <span>{collection.pdfs?.length || 0} documents</span>
+                      </div>
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        {getVisibilityIcon(collection.visibility)}
+                        <span>{getVisibilityLabel(collection.visibility)}</span>
+                      </Badge>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleViewCollection(collection.id)}
+                    >
+                      View Collection
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
           </TabsContent>
         </Tabs>
       </div>
 
       <Footer />
 
+      {/* Dialogs */}
       {/* Create Collection Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent aria-describedby="create-collection-description">
@@ -608,9 +660,9 @@ export default function CollectionsPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="collection-visibility">Visibility</Label>
-              <div className="flex gap-4">
-                <div className="flex items-center">
+              <Label>Visibility</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="relative flex items-center">
                   <input
                     type="radio"
                     id="visibility-private"
@@ -618,14 +670,21 @@ export default function CollectionsPage() {
                     value="private"
                     checked={newCollectionVisibility === "private"}
                     onChange={() => setNewCollectionVisibility("private")}
-                    className="mr-2"
+                    className="peer sr-only"
                   />
-                  <Label htmlFor="visibility-private" className="flex items-center cursor-pointer">
-                    <Lock className="h-4 w-4 mr-1 text-red-500" />
-                    Private
+                  <Label 
+                    htmlFor="visibility-private" 
+                    className="flex flex-col items-center justify-center w-full p-4 text-gray-500 border border-gray-200 rounded-lg cursor-pointer peer-checked:border-primary peer-checked:text-primary hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <Lock className="h-6 w-6 mb-2" />
+                    <div className="w-full text-center">
+                      <div className="font-semibold">Private</div>
+                      <div className="text-xs">Only you can access</div>
+                    </div>
                   </Label>
                 </div>
-                <div className="flex items-center">
+
+                <div className="relative flex items-center">
                   <input
                     type="radio"
                     id="visibility-shared"
@@ -633,14 +692,21 @@ export default function CollectionsPage() {
                     value="shared"
                     checked={newCollectionVisibility === "shared"}
                     onChange={() => setNewCollectionVisibility("shared")}
-                    className="mr-2"
+                    className="peer sr-only"
                   />
-                  <Label htmlFor="visibility-shared" className="flex items-center cursor-pointer">
-                    <Users className="h-4 w-4 mr-1 text-blue-500" />
-                    Shared
+                  <Label 
+                    htmlFor="visibility-shared" 
+                    className="flex flex-col items-center justify-center w-full p-4 text-gray-500 border border-gray-200 rounded-lg cursor-pointer peer-checked:border-primary peer-checked:text-primary hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <Users className="h-6 w-6 mb-2" />
+                    <div className="w-full text-center">
+                      <div className="font-semibold">Shared</div>
+                      <div className="text-xs">Specific people can access</div>
+                    </div>
                   </Label>
                 </div>
-                <div className="flex items-center">
+
+                <div className="relative flex items-center">
                   <input
                     type="radio"
                     id="visibility-public"
@@ -648,11 +714,17 @@ export default function CollectionsPage() {
                     value="public"
                     checked={newCollectionVisibility === "public"}
                     onChange={() => setNewCollectionVisibility("public")}
-                    className="mr-2"
+                    className="peer sr-only"
                   />
-                  <Label htmlFor="visibility-public" className="flex items-center cursor-pointer">
-                    <Globe className="h-4 w-4 mr-1 text-green-500" />
-                    Public
+                  <Label 
+                    htmlFor="visibility-public" 
+                    className="flex flex-col items-center justify-center w-full p-4 text-gray-500 border border-gray-200 rounded-lg cursor-pointer peer-checked:border-primary peer-checked:text-primary hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <Globe className="h-6 w-6 mb-2" />
+                    <div className="w-full text-center">
+                      <div className="font-semibold">Public</div>
+                      <div className="text-xs">Anyone can view</div>
+                    </div>
                   </Label>
                 </div>
               </div>
@@ -672,67 +744,93 @@ export default function CollectionsPage() {
         <DialogContent aria-describedby="edit-collection-description">
           <DialogHeader>
             <DialogTitle>Edit Collection</DialogTitle>
-            <DialogDescription id="edit-collection-description">Update your collection details.</DialogDescription>
+            <DialogDescription id="edit-collection-description">
+              Update your collection details.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-name">Collection Name</Label>
-              <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <Input
+                id="edit-name"
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-description">Description</Label>
               <Input
                 id="edit-description"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
+                value={newCollectionDescription}
+                onChange={(e) => setNewCollectionDescription(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-visibility">Visibility</Label>
-              <div className="flex gap-4">
-                <div className="flex items-center">
+              <Label>Visibility</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="relative flex items-center">
                   <input
                     type="radio"
                     id="edit-visibility-private"
                     name="edit-visibility"
                     value="private"
-                    checked={editVisibility === "private"}
-                    onChange={() => setEditVisibility("private")}
-                    className="mr-2"
+                    checked={newCollectionVisibility === "private"}
+                    onChange={() => setNewCollectionVisibility("private")}
+                    className="peer sr-only"
                   />
-                  <Label htmlFor="edit-visibility-private" className="flex items-center cursor-pointer">
-                    <Lock className="h-4 w-4 mr-1 text-red-500" />
-                    Private
+                  <Label 
+                    htmlFor="edit-visibility-private" 
+                    className="flex flex-col items-center justify-center w-full p-4 text-gray-500 border border-gray-200 rounded-lg cursor-pointer peer-checked:border-primary peer-checked:text-primary hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <Lock className="h-6 w-6 mb-2" />
+                    <div className="w-full text-center">
+                      <div className="font-semibold">Private</div>
+                      <div className="text-xs">Only you can access</div>
+                    </div>
                   </Label>
                 </div>
-                <div className="flex items-center">
+
+                <div className="relative flex items-center">
                   <input
                     type="radio"
                     id="edit-visibility-shared"
                     name="edit-visibility"
                     value="shared"
-                    checked={editVisibility === "shared"}
-                    onChange={() => setEditVisibility("shared")}
-                    className="mr-2"
+                    checked={newCollectionVisibility === "shared"}
+                    onChange={() => setNewCollectionVisibility("shared")}
+                    className="peer sr-only"
                   />
-                  <Label htmlFor="edit-visibility-shared" className="flex items-center cursor-pointer">
-                    <Users className="h-4 w-4 mr-1 text-blue-500" />
-                    Shared
+                  <Label 
+                    htmlFor="edit-visibility-shared" 
+                    className="flex flex-col items-center justify-center w-full p-4 text-gray-500 border border-gray-200 rounded-lg cursor-pointer peer-checked:border-primary peer-checked:text-primary hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <Users className="h-6 w-6 mb-2" />
+                    <div className="w-full text-center">
+                      <div className="font-semibold">Shared</div>
+                      <div className="text-xs">Specific people can access</div>
+                    </div>
                   </Label>
                 </div>
-                <div className="flex items-center">
+
+                <div className="relative flex items-center">
                   <input
                     type="radio"
                     id="edit-visibility-public"
                     name="edit-visibility"
                     value="public"
-                    checked={editVisibility === "public"}
-                    onChange={() => setEditVisibility("public")}
-                    className="mr-2"
+                    checked={newCollectionVisibility === "public"}
+                    onChange={() => setNewCollectionVisibility("public")}
+                    className="peer sr-only"
                   />
-                  <Label htmlFor="edit-visibility-public" className="flex items-center cursor-pointer">
-                    <Globe className="h-4 w-4 mr-1 text-green-500" />
-                    Public
+                  <Label 
+                    htmlFor="edit-visibility-public" 
+                    className="flex flex-col items-center justify-center w-full p-4 text-gray-500 border border-gray-200 rounded-lg cursor-pointer peer-checked:border-primary peer-checked:text-primary hover:text-gray-600 hover:bg-gray-100"
+                  >
+                    <Globe className="h-6 w-6 mb-2" />
+                    <div className="w-full text-center">
+                      <div className="font-semibold">Public</div>
+                      <div className="text-xs">Anyone can view</div>
+                    </div>
                   </Label>
                 </div>
               </div>
@@ -765,104 +863,38 @@ export default function CollectionsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="search-users">Search Users</Label>
-              <Input
-                id="search-users"
-                placeholder="Search by name or email"
-                value={searchUserQuery}
-                onChange={(e) => setSearchUserQuery(e.target.value)}
-              />
-            </div>
-            <div className="border rounded-md overflow-hidden">
-              <div className="p-2 bg-muted font-medium">Users</div>
-              <div className="max-h-60 overflow-y-auto">
-                {filteredUsers.length > 0 ? (
-                  filteredUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer"
-                      onClick={() => toggleUserSelection(user.id)}
-                    >
-                      <div className="flex items-center">
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarImage src={user.avatar} alt={user.name} />
-                          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center h-5 w-5 rounded-sm border border-primary">
-                        {selectedUsers.includes(user.id) && <Check className="h-4 w-4 text-primary" />}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground">No users found</div>
-                )}
-              </div>
-            </div>
-            {selectedUsers.length > 0 && (
-              <div>
-                <Label className="mb-2 block">Selected Users ({selectedUsers.length})</Label>
-                <div className="flex flex-wrap gap-2">
-                  {selectedUsers.map((userId) => {
-                    const user = mockUsers.find((u) => u.id === userId)
-                    if (!user) return null
-                    return (
-                      <Badge key={userId} variant="secondary" className="flex items-center gap-1">
-                        <span>{user.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 ml-1"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleUserSelection(userId)
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    )
-                  })}
+              <Label htmlFor="share-permission">Permission Level</Label>
+              <div className="flex gap-4">
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="permission-read"
+                    name="permission"
+                    value="READ"
+                    checked={sharePermission === "READ"}
+                    onChange={() => setSharePermission("READ")}
+                    className="mr-2"
+                  />
+                  <Label htmlFor="permission-read" className="flex items-center cursor-pointer">
+                    <Eye className="h-4 w-4 mr-1 text-blue-500" />
+                    Read Only
+                  </Label>
                 </div>
-              </div>
-            )}
-          </div>
-          <div className="grid gap-2 mt-4">
-            <Label>Permission Level</Label>
-            <div className="flex gap-4">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="permission-read"
-                  name="permission"
-                  value="READ"
-                  checked={sharePermission === "READ"}
-                  onChange={() => setSharePermission("READ")}
-                  className="mr-2"
-                />
-                <Label htmlFor="permission-read" className="flex items-center cursor-pointer">
-                  <Eye className="h-4 w-4 mr-1 text-blue-500" />
-                  Read Only
-                </Label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="permission-edit"
-                  name="permission"
-                  value="EDIT"
-                  checked={sharePermission === "EDIT"}
-                  onChange={() => setSharePermission("EDIT")}
-                  className="mr-2"
-                />
-                <Label htmlFor="permission-edit" className="flex items-center cursor-pointer">
-                  <Edit className="h-4 w-4 mr-1 text-green-500" />
-                  Can Edit
-                </Label>
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="permission-edit"
+                    name="permission"
+                    value="EDIT"
+                    checked={sharePermission === "EDIT"}
+                    onChange={() => setSharePermission("EDIT")}
+                    className="mr-2"
+                  />
+                  <Label htmlFor="permission-edit" className="flex items-center cursor-pointer">
+                    <Edit className="h-4 w-4 mr-1 text-green-500" />
+                    Can Edit
+                  </Label>
+                </div>
               </div>
             </div>
           </div>
@@ -870,7 +902,7 @@ export default function CollectionsPage() {
             <Button variant="outline" onClick={() => setShowShareDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveSharing}>Share Collection</Button>
+            {/* <Button onClick={handleSaveSharing}>Share Collection</Button> */}
           </DialogFooter>
         </DialogContent>
       </Dialog>
