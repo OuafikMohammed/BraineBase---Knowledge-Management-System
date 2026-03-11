@@ -139,11 +139,11 @@ We welcome contributions! Here's how you can help:
 4. 🚀 Push to the branch (`git push origin feature/AmazingFeature`)
 5. 🔍 Open a Pull Request
 
-Check out our [Contributing Guidelines](CONTRIBUTING.md) for more details.
+Check out  [![GitHub](https://img.shields.io/badge/GitHub-OuafikMohammed-181717?logo=github)](https://github.com/OuafikMohammed) for more projects !
 
 
 
-[![GitHub](https://img.shields.io/badge/GitHub-OuafikMohammed-181717?logo=github)](https://github.com/OuafikMohammed)
+
 
 
 ---
