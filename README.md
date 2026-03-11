@@ -127,27 +127,8 @@ BraineBase/
 └── package.json          # Dependencies
 ```
 
----
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-1. 🍴 Fork the repository
-2. 🌿 Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. 💻 Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. 🚀 Push to the branch (`git push origin feature/AmazingFeature`)
-5. 🔍 Open a Pull Request
-
-Check out  [![GitHub](https://img.shields.io/badge/GitHub-OuafikMohammed-181717?logo=github)](https://github.com/OuafikMohammed) for more projects !
-
-
-
-
-
-
----
+[![GitHub](https://img.shields.io/badge/GitHub-OuafikMohammed-181717?logo=github)](https://github.com/OuafikMohammed)
 
 ### ⭐ Found this project useful? Give it a star! It helps others discover it.
 
-<p align="center">Made with ❤️ by developers, for knowledge seekers</p>
+<p align="center">Made with ❤️ for knowledge seekers</p>
