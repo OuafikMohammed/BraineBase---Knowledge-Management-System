@@ -13,8 +13,7 @@ BraineBase is a powerful and intuitive Knowledge Management System that helps in
 
 ## Tech Stack
 - **Frontend:** React.js
-- **Backend:** Node.js, Express
-- **Database:** MongoDB
+- **Backend:** LARAVEL ON https://github.com/OuafikMohammed/BrainBase-Backend
 - **Authentication:** JWT (JSON Web Tokens)
 - **Styling:** CSS, Bootstrap
 
@@ -36,28 +35,3 @@ BraineBase is a powerful and intuitive Knowledge Management System that helps in
    ```bash
    npm start
    ```
-
-## Usage
-1. Create an account or log in to the existing account.
-2. Start creating and managing your knowledge base.
-3. Explore the search feature to find relevant articles.
-
-## Contribution Guidelines
-We welcome contributions to improve the BraineBase project. Please follow these steps:
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix:
-   ```bash
-   git checkout -b feature/YourFeature
-   ```
-3. Make your changes and commit them:
-   ```bash
-   git commit -m "Add some feature"
-   ```
-4. Push to the branch:
-   ```bash
-   git push origin feature/YourFeature
-   ```
-5. Open a pull request.
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
